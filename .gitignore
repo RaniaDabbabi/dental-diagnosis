@@ -1,0 +1,15 @@
+# Environnement virtuel
+venv/
+
+# Configuration IDE
+.vscode/
+
+# Node.js modules
+node_modules/
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Modèles volumineux
+*.keras
