@@ -8,7 +8,10 @@ import Chatbot from './Diagnostic';
 import { Navbar, Footer } from './layout';
 import DentistList from './Dentist';
 import AdminDentistManagement from './admin/AdminDentistManagement';
-
+import DentalCareArticle from './Home/Articles/Article1';
+import Article2 from './Home/Articles/Article2';
+import Article3 from './Home/Articles/Article3';
+import Apropos from'./Apropos';
 const isAuthenticated = () => {
   const user = JSON.parse(localStorage.getItem("user"));
   return user !== null;
@@ -29,6 +32,11 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
+            <Route path="/Home/Articles/Article1" element={<DentalCareArticle />} />
+            <Route path="/Home/Articles/Article2" element={<Article2 />} />
+            <Route path="/Home/Articles/Article3" element={<Article3 />} />
+            <Route path="/Apropos" element={<Apropos />} />
+
             <Route
               path="/diagnostic"
               element={

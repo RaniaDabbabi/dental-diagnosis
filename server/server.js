@@ -1,37 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
-const axios = require('axios'); 
-const fs = require('fs');
-const FormData = require('form-data');
+const path = require('path'); // Import du module path
+const multer = require('multer');
 const app = express();
-const multer = require('multer');  
-const upload = multer(); 
 const PORT = 5000;
-const User = require('./models/User'); 
+const User = require('./models/User');
 const Dentist = require('./models/Dentist');
-const { body, validationResult } = require('express-validator');
-const validateDentist = [
-  body('name').notEmpty().withMessage('Name is required'),
-  body('specialization').notEmpty().withMessage('Specialization is required'),
-  body('address').notEmpty().withMessage('Address is required'),
-  body('city').notEmpty().withMessage('City is required'),
-  body('phone').notEmpty().withMessage('Phone is required').isMobilePhone(),
-  (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-    next();
-  },
-];
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
 // MongoDB Connection
 const mongoURI = 'mongodb://127.0.0.1:27017/dental_diagnostic';
 mongoose
@@ -39,44 +16,79 @@ mongoose
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.error('Error connecting to MongoDB:', err));
 
+// Configuration de Multer pour l'upload de fichiers
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  },
+});
 
-// Route d'inscription
-app.post('/api/signup', async (req, res) => {
+const upload = multer({ storage });
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Route pour l'inscription
+app.post('/api/signup', upload.single('image'), async (req, res) => {
+  const { username, password, email, firstname, lastname, city, isDentist, phone, address, workDays, workHours } = req.body;
+
   try {
-    const { username, password, email, firstname, lastname, gender, city,role } = req.body;
-
-    // Vérifiez si l'utilisateur existe déjà
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({ message: 'Username already exists' });
-    }
-
-    const existingUser = await User.findOne({ email });
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
     if (existingUser) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ message: 'Username or email already exists' });
     }
 
-    // Générez le hash pour le mot de passe
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Hacher le mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Créez un nouvel utilisateur
-    const newUser = new User({
+    // Créer un nouvel utilisateur
+    const userData = {
       username,
       password: hashedPassword,
       email,
       firstname,
       lastname,
-      gender,
       city,
-      role,
-    });
+      image: req.file ? req.file.path : null, // Chemin de l'image si elle existe
+    };
 
-    await newUser.save();
-    res.status(201).json({ message: 'User registered successfully' });
+    if (isDentist === 'true') {
+      // Vérifier que les champs spécifiques au dentiste sont fournis
+      if (!phone || !address || !workDays || !workHours) {
+        return res.status(400).json({ message: 'Missing required fields for dentist' });
+      }
+
+      // Parser workDays et workHours en objets JavaScript
+      const parsedWorkDays = JSON.parse(workDays);
+      const parsedWorkHours = JSON.parse(workHours);
+
+      // Créer un dentiste
+      const dentist = new Dentist({
+        ...userData,
+        address,
+        phone,
+        workDays: parsedWorkDays, // Tableau d'objets
+        workHours: parsedWorkHours, // Objet
+      });
+
+      await dentist.save();
+      return res.status(201).json({ message: 'Dentist registered successfully' });
+    } else {
+      // Créer un utilisateur normal
+      const user = new User(userData);
+      await user.save();
+      return res.status(201).json({ message: 'User registered successfully' });
+    }
   } catch (error) {
-    console.error('Error during signup:', error.message);
-    res.status(500).json({ message: `Server error: ${error.message}` });
+    console.error('Error during registration:', error);
+    res.status(500).json({ message: 'Server error during registration', error: error.message });
   }
 });
 
@@ -85,24 +97,42 @@ app.post('/api/signin', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const user = await User.findOne({ username });
+    // Rechercher l'utilisateur dans la collection User
+    let user = await User.findOne({ username });
 
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Incorrect username or password." });
+    // Si l'utilisateur n'est pas trouvé, rechercher dans la collection Dentist
+    if (!user) {
+      user = await Dentist.findOne({ username });
     }
 
+    // Si l'utilisateur n'existe pas
+    if (!user) {
+      return res.status(401).json({ message: 'Nom d\'utilisateur ou mot de passe incorrect.' });
+    }
+
+    // Vérifier le mot de passe
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Nom d\'utilisateur ou mot de passe incorrect.' });
+    }
+
+    // Renvoyer une réponse réussie
     res.status(200).json({
-      message: "Login successful",
-      firstName: user.firstname,
-      username: user.username,
-      role:user.role,
+      message: 'Connexion réussie',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role || 'User', // Si vous utilisez des discriminateurs
+      },
     });
   } catch (error) {
-    console.error('Error during login:', error);
-    res.status(500).json({ message: "Server error." });
+    console.error('Erreur lors de la connexion:', error);
+    res.status(500).json({ message: 'Erreur de serveur lors de la connexion.', error: error.message });
   }
 });
 
+/*
 app.post('/api/diagnostic', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -126,7 +156,6 @@ app.post('/api/diagnostic', upload.single('image'), async (req, res) => {
   }
 });
 
-// Route pour récupérer tous les dentistes
 // Exemple avec Express et MongoDB
 app.get('/api/dentists', (req, res) => {
   const { city } = req.query;
@@ -140,9 +169,6 @@ app.get('/api/dentists', (req, res) => {
     .then((dentists) => res.json(dentists))
     .catch((error) => res.status(500).json({ message: "Erreur du serveur", error }));
 });
-
-
-
 
 // Route pour ajouter un dentiste
 app.post('/api/dentists', validateDentist, async (req, res) => {
@@ -215,7 +241,7 @@ app.delete('/api/dentists/:id', async (req, res) => {
   }
 });
 
-
+*/
 // Start Server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

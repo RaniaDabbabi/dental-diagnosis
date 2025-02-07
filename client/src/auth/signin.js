@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 
 const SignIn = () => {
   const [formData, setFormData] = useState({
@@ -9,9 +9,9 @@ const SignIn = () => {
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState(false);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
-  // Update form fields
+  // Mettre à jour les champs du formulaire
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
@@ -20,18 +20,20 @@ const SignIn = () => {
     }));
   };
 
-  // Handle form submission
+  // Gérer la soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { username, password } = formData;
-  
+
+    // Vérifier que tous les champs sont remplis
     if (!username || !password) {
       setMessage('Tous les champs sont obligatoires.');
       setError(true);
       return;
     }
-  
+
     try {
+      // Envoyer une requête POST au serveur
       const response = await fetch('http://localhost:5000/api/signin', {
         method: 'POST',
         headers: {
@@ -39,33 +41,38 @@ const SignIn = () => {
         },
         body: JSON.stringify(formData),
       });
-  
+
       const data = await response.json();
+
+      // Si la connexion est réussie
       if (response.ok) {
+        // Stocker les informations de l'utilisateur dans le localStorage
         const user = {
-          firstName: data.firstName,
-          username: data.username,
-          role: data.role, 
+          id: data.user.id,
+          username: data.user.username,
+          email: data.user.email,
+          role: data.user.role,
         };
         localStorage.setItem('user', JSON.stringify(user));
+
+        // Afficher un message de succès
         setMessage('Connexion réussie');
         setError(false);
-      
-        navigate('/'); 
-        window.location.reload();
+
+        // Rediriger vers la page d'accueil
+        navigate('/');
+        window.location.reload(); // Recharger la page pour mettre à jour l'état de l'application
       } else {
+        // Afficher un message d'erreur
         setMessage(data.message || 'Erreur de serveur.');
         setError(true);
       }
-      
     } catch (error) {
       console.error('Erreur de connexion au serveur:', error);
       setMessage('Erreur de connexion au serveur.');
       setError(true);
     }
   };
-  
-  
 
   return (
     <div
@@ -84,7 +91,7 @@ const SignIn = () => {
     >
       <h2 className="text-center mb-4">Se Connecter</h2>
       <form onSubmit={handleSubmit}>
-        {/* Username */}
+        {/* Nom d'utilisateur */}
         <div className="form-group mb-4">
           <input
             type="text"
@@ -97,7 +104,7 @@ const SignIn = () => {
           />
         </div>
 
-        {/* Password */}
+        {/* Mot de passe */}
         <div className="form-group mb-4">
           <input
             type="password"
@@ -110,8 +117,8 @@ const SignIn = () => {
           />
         </div>
 
-        {/* Submit */}
-        <div className="form-group text-center mb-4 ">
+        {/* Bouton de soumission */}
+        <div className="form-group text-center mb-4">
           <input
             type="submit"
             value="Se connecter"
@@ -134,4 +141,4 @@ const SignIn = () => {
   );
 };
 
-export default SignIn;   
+export default SignIn;

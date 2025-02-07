@@ -103,3 +103,192 @@
 .chat-option:hover {
   background-color: #0056b3;
 }
+/* HomePage.css */
+.article-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.article-list li {
+  margin: 10px 0;
+}
+
+.article-list a {
+  text-decoration: none;
+  color: #007bff;
+}
+
+.article-list a:hover {
+  text-decoration: underline;
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.video-item {
+  background: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.video-item iframe {
+  border-radius: 8px;
+}
+
+.video-item p {
+  margin-top: 10px;
+  font-size: 16px;
+  text-align: center;
+}
+/* Styles pour la liste d'articles */
+.article-list-container {
+  overflow: hidden; /* Cache le débordement */
+  position: relative;
+  padding: 20px 0;
+}
+
+.article-list {
+  display: flex;
+  animation: scroll 20s linear infinite; /* Animation de défilement */
+  gap: 20px; /* Espace entre les articles */
+}
+
+
+.article-title:hover {
+  text-decoration: underline;
+}
+
+/* Animation de défilement */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%); /* Défilement jusqu'à la moitié de la liste */
+  }
+}
+/* Styles pour la liste d'articles et de vidéos */
+.article-list-container,
+.video-list-container {
+  overflow: hidden; /* Cache le débordement */
+  position: relative;
+  padding: 20px 0;
+}
+
+.article-list,
+.video-list {
+  display: flex;
+  animation: scroll 20s linear infinite; /* Animation de défilement */
+  gap: 20px; /* Espace entre les éléments */
+}
+
+
+.video-item {
+  flex: 0 0 auto; /* Empêche les éléments de rétrécir */
+  width: 400px;/* Largeur fixe pour chaque élément */
+  height:300px; 
+  text-align: center;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+}
+
+.article-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover; /* Ajuste l'image pour couvrir la zone */
+  border-radius: 8px;
+}
+
+.article-title {
+  display: block;
+  margin-top: 10px;
+  font-size: 16px;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.article-title:hover {
+  text-decoration: underline;
+}
+
+.video-item iframe {
+  border-radius: 8px;
+}
+
+.video-item p {
+  margin-top: 10px;
+  font-size: 16px;
+  text-align: center;
+}
+
+/* Animation de défilement */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%); /* Défilement jusqu'à la moitié de la liste */
+  }
+}
+.article-list-container {
+  overflow: hidden; /* Cache le débordement */
+  position: relative;
+  padding: 20px 0;
+}
+
+.article-list {
+  display: flex;
+  animation: scroll 20s linear infinite; /* Animation de défilement */
+  gap: 20px; /* Espace entre les éléments */
+}
+
+.article-item {
+  flex: 0 0 auto; /* Empêche les éléments de rétrécir */
+  width: 250px; /* Largeur fixe pour chaque élément */
+  text-align: center;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  cursor: pointer; /* Change le curseur en pointeur */
+}
+
+.article-item:hover {
+  transform: scale(1.05); /* Effet de zoom au survol */
+  transition: transform 0.3s ease;
+}
+
+.article-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover; /* Ajuste l'image pour couvrir la zone */
+  border-radius: 8px;
+}
+
+.article-title {
+  display: block;
+  margin-top: 10px;
+  font-size: 16px;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.article-title:hover {
+  text-decoration: underline;
+}
+
+/* Animation de défilement */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%); /* Défilement jusqu'à la moitié de la liste */
+  }
+}

@@ -1,13 +1,61 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './HomePage.css';
+import VideoList from './Home/VideoList';
+import ArticleList from './Home/ArticleList';
+
 
 function HomePage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentNode, setCurrentNode] = useState("start");
   const [conversation, setConversation] = useState([]);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
+  // Exemple de données pour les articles et les vidéos
+  const articles = [
+    {
+      id: 1,
+      title: "10 conseils d’un dentiste pour une bonne hygiène dentaire",
+      image: "/images/article1.jpeg",
+      link: "/Home/Articles/Article1",
+    },
+    {
+      id: 2,
+      title: "Pourquoi les radiographies dentaires sont-elles essentielles pour votre santé ?",
+      image: "/images/article2.jpeg",
+      link: "/Home/Articles/Article2",
+    },
+    {
+      id: 3,
+      title: "Les bienfaits du brossage régulier",
+      image: "/images/article3.jpeg",
+      link: "/Home/Articles/Article3",
+    },
+  
+  ];
+  
+  const videos = [
+    {
+      title: "Comment faut-il se brosser les DENTS",
+      link: "/Videos/V2.mp4",
+    },
+    {
+      title: "Rincez-vous votre bouche après avoir brossé vos dents Si oui, ne le faites plus!",
+      link: "/Videos/V3.mp4", 
+    },
+    {
+      title :"7 conseils pour des dents en santé",
+      link:"/Videos/V1.mp4",
+    },
+    {
+      title: "Les 3 erreurs qui peuvent ruiner votre sourire",
+      link: "/Videos/V4.mp4",
+    },
+    {
+      title: "Le détatrage",
+      link: "/Videos/V5.mp4",
+    },
+  ];
   // Data structure to manage chatbot questions and options
   const chatData = {
     start: {
@@ -130,19 +178,33 @@ function HomePage() {
         </div>
       </header>
 
-      {/* About Section */}
-      <section className="py-5">
-        <div className="container text-center">
-          <h2>À propos de nous</h2>
-          <p className="lead">
-            Dental Diagnostic est une plateforme moderne utilisant l'intelligence artificielle pour aider à diagnostiquer
-            les problèmes dentaires rapidement et efficacement.
-          </p>
+    <br/>  
+      {/* Article List Section */}
+      <section className="bg-light py-5">
+        <div className="container">
+          <ArticleList articles={articles} />
         </div>
       </section>
-
-      {/* Features Section */}
+<br/>
+      {/* Video List Section */}
       <section className="bg-light py-5">
+        <div className="container">
+          <VideoList videos={videos} />
+        </div>
+      </section>
+      <br/>
+
+{/* About Section */}
+<section className="py-5">
+  <div className="container text-center">
+    <h2>À propos de nous</h2>
+    <p className="lead">
+      Dental Diagnostic est une plateforme innovante qui utilise l'intelligence artificielle pour révolutionner les soins dentaires. Nous proposons des conseils de santé et des vidéos éducatives sur des thématiques comme la prévention, les traitements et l'hygiène quotidienne. Notre chatbot interactif répond à vos questions, vous guide dans l'utilisation de la plateforme et permet même l'envoi de photos pour une analyse rapide. Grâce à notre IA, nous détectons des anomalies dentaires telles que les caries, les inflammations ou les fractures, et générons un rapport détaillé avec des recommandations personnalisées. De plus, nous vous aidons à trouver les dentistes les plus proches grâce à un système de recommandation basé sur votre localisation, avec des profils détaillés incluant leurs spécialités, horaires et avis des patients. Enfin, vous pouvez partager votre diagnostic directement avec votre dentiste via un lien sécurisé, facilitant ainsi un suivi personnalisé. Dental Diagnostic s'engage à rendre les soins dentaires modernes, accessibles et efficaces pour tous.
+    </p>
+  </div>
+</section>      
+{/* Features Section */}
+<section className="bg-light py-5">
         <div className="container">
           <h2 className="text-center">Nos fonctionnalités</h2>
           <div className="row text-center mt-4">
@@ -164,7 +226,6 @@ function HomePage() {
           </div>
         </div>
       </section>
-
       {/* Chatbot Bubble */}
       <div className="chat-bubble" onClick={toggleChat}>
         <i className="bi bi-chat-dots-fill"></i>

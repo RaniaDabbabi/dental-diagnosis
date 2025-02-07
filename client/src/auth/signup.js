@@ -1,5 +1,7 @@
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUser, faLock, faEnvelope, faIdCard, faCity, faPhone, faMapMarkerAlt, faCalendarAlt, faClock, faImage } from '@fortawesome/free-solid-svg-icons';
 
 class SignUp extends React.Component {
   constructor(props) {
@@ -11,14 +13,19 @@ class SignUp extends React.Component {
         email: '',
         firstname: '',
         lastname: '',
-        gender: '',
         city: '',
+        isDentist: false,
+        phone: '',
+        address: '',
+        workDays: { start: '', end: '' },
+        workHours: { open: '', close: '' },
+        image: null,
       },
       message: '',
       error: false,
     };
 
-    // Static list of Tunisian cities
+    this.daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
     this.tunisianCities = [
       'Tunis', 'Sfax', 'Sousse', 'Kairouan', 'Gabès', 'Bizerte', 'Ariana', 'Gafsa', 'Monastir', 'Médenine',
       'Nabeul', 'Tataouine', 'Beja', 'Jendouba', 'Tozeur', 'Kasserine', 'Zarzis', 'Kebili', 'Mahdia', 'Siliana',
@@ -26,45 +33,97 @@ class SignUp extends React.Component {
     ];
   }
 
-  // Update form fields
-  handleInputChange = (e) => {
-    const { name, value } = e.target;
+  handleWorkDaysChange = (key, value) => {
     this.setState((prevState) => ({
-      formData: { ...prevState.formData, [name]: value },
+      formData: {
+        ...prevState.formData,
+        workDays: {
+          ...prevState.formData.workDays,
+          [key]: value
+        }
+      }
     }));
   };
 
-  // Handle form submission
+  handleWorkHoursChange = (key, value) => {
+    this.setState((prevState) => ({
+      formData: {
+        ...prevState.formData,
+        workHours: {
+          ...prevState.formData.workHours,
+          [key]: value
+        }
+      }
+    }));
+  };
+
+  handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+  
+    this.setState((prevState) => {
+      let updatedValue = type === 'checkbox' ? checked : value;
+  
+      if (name.includes('.')) {
+        const [parent, child] = name.split('.');
+        return {
+          formData: {
+            ...prevState.formData,
+            [parent]: {
+              ...prevState.formData[parent],
+              [child]: value
+            }
+          }
+        };
+      }
+  
+      return {
+        formData: {
+          ...prevState.formData,
+          [name]: updatedValue,
+        }
+      };
+    });
+  };
+
+  handleFileChange = (e) => {
+    this.setState((prevState) => ({
+      formData: {
+        ...prevState.formData,
+        image: e.target.files[0],
+      },
+    }));
+  };
+
   handleSubmit = async (e) => {
     e.preventDefault();
     const { formData } = this.state;
 
-    // Validation des champs
     for (const field in formData) {
-      if (!formData[field]) {
-        this.setState({ message: 'Tous les champs sont obligatoires.', error: true });
+      if (field !== 'isDentist' && field !== 'phone' && field !== 'address' && field !== 'workDays' && field !== 'workHours' && field !== 'image' && !formData[field]) {
+        this.setState({ message: 'Tous les champs obligatoires doivent être remplis.', error: true });
         return;
       }
     }
 
+    const formDataToSend = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (formData[key] instanceof File) {
+        formDataToSend.append(key, formData[key]);
+      } else if (typeof formData[key] === 'object') {
+        formDataToSend.append(key, JSON.stringify(formData[key]));
+      } else {
+        formDataToSend.append(key, formData[key]);
+      }
+    });
+
     try {
       const response = await fetch('http://localhost:5000/api/signup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        body: formDataToSend,
       });
 
       const data = await response.json();
-
-      if (response.ok) {
-        this.setState({ message: data.message, error: false });
-      
-
-      } else {
-        this.setState({ message: data.message || 'Erreur de serveur.', error: true });
-      }
+      this.setState({ message: response.ok ? data.message : data.message || 'Erreur de serveur.', error: !response.ok });
     } catch (error) {
       console.error('Erreur de connexion au serveur:', error);
       this.setState({ message: 'Erreur de connexion au serveur.', error: true });
@@ -75,150 +134,125 @@ class SignUp extends React.Component {
     const { formData, message, error } = this.state;
 
     return (
-      <div
-        className="d-flex justify-content-center align-items-center"
-        style={{
-          height: '100vh',
-          backgroundColor: '#f8f9fa',
-        }}
-      >
-        <div
-          className="signup-form mb-4"
-          style={{
-            backgroundColor: '#ffffff',
-            color: 'black',
-            padding: '30px',
-            borderRadius: '8px',
-            maxWidth: '500px',
-            width: '100%',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-          }}
-        >
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', backgroundColor: '#f8f9fa' }}>
+        <div className="signup-form mb-4" style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '8px', maxWidth: '500px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
           <h2 className="text-center mb-4">Créer un Compte</h2>
           <form onSubmit={this.handleSubmit}>
-            {/* Username */}
-            <div className="form-group mb-4">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Nom d'utilisateur"
-                name="username"
-                value={formData.username}
-                onChange={this.handleInputChange}
-                required
-              />
-            </div>
-
-            {/* Password */}
-            <div className="form-group mb-4">
-              <input
-                type="password"
-                className="form-control"
-                placeholder="Mot de passe"
-                name="password"
-                value={formData.password}
-                onChange={this.handleInputChange}
-                required
-              />
-            </div>
-
-            {/* Email */}
-            <div className="form-group mb-4">
-              <input
-                type="email"
-                className="form-control"
-                placeholder="Email"
-                name="email"
-                value={formData.email}
-                onChange={this.handleInputChange}
-                required
-              />
-            </div>
-
-            {/* First Name and Last Name */}
-            <div className="form-row mb-4">
-              <div className="form-group col-md-6 mb-4">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Prénom"
-                  name="firstname"
-                  value={formData.firstname}
-                  onChange={this.handleInputChange}
-                  required
-                />
-              </div>
-              <div className="form-group col-md-6 mb-4">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Nom"
-                  name="lastname"
-                  value={formData.lastname}
-                  onChange={this.handleInputChange}
-                  required
-                />
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faUser} /></span>
+                <input type="text" className="form-control" placeholder="Nom d'utilisateur" name="username" value={formData.username} onChange={this.handleInputChange} required />
               </div>
             </div>
 
-            {/* Gender */}
-            <div className="form-group mb-4">
-              <label className="mr-3 ">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="Male"
-                  onChange={this.handleInputChange}
-                  checked={formData.gender === 'Male'}
-                />
-                Homme
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="gender"
-                  value="Female"
-                  onChange={this.handleInputChange}
-                  checked={formData.gender === 'Female'}
-                />
-                Femme
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faLock} /></span>
+                <input type="password" className="form-control" placeholder="Mot de passe" name="password" value={formData.password} onChange={this.handleInputChange} required />
+              </div>
+            </div>
+
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faEnvelope} /></span>
+                <input type="email" className="form-control" placeholder="Email" name="email" value={formData.email} onChange={this.handleInputChange} required />
+              </div>
+            </div>
+
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faIdCard} /></span>
+                <input type="text" className="form-control" placeholder="Prénom" name="firstname" value={formData.firstname} onChange={this.handleInputChange} required />
+              </div>
+            </div>
+
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faIdCard} /></span>
+                <input type="text" className="form-control" placeholder="Nom" name="lastname" value={formData.lastname} onChange={this.handleInputChange} required />
+              </div>
+            </div>
+
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faCity} /></span>
+                <select className="form-control" name="city" value={formData.city} onChange={this.handleInputChange} required>
+                  <option value="">- Sélectionner une ville -</option>
+                  {this.tunisianCities.map((city) => <option key={city} value={city}>{city}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group mb-3">
+              <label className="form-check-label">
+                <input type="checkbox" className="form-check-input" name="isDentist" checked={formData.isDentist} onChange={this.handleInputChange} /> Je suis un dentiste
               </label>
             </div>
 
-            {/* City */}
-            <div className="form-group mb-4">
-              <select
-                className="form-control"
-                name="city"
-                value={formData.city}
-                onChange={this.handleInputChange}
-                required
-              >
-                <option value="">- Sélectionner une ville -</option>
-                {this.tunisianCities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
+            {formData.isDentist && (
+              <>
+                <div className="form-group mb-3">
+                  <div className="input-group">
+                    <span className="input-group-text"><FontAwesomeIcon icon={faPhone} /></span>
+                    <input type="text" className="form-control" placeholder="Téléphone" name="phone" value={formData.phone} onChange={this.handleInputChange} required />
+                  </div>
+                </div>
+
+                <div className="form-group mb-3">
+                  <div className="input-group">
+                    <span className="input-group-text"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
+                    <input type="text" className="form-control" placeholder="Adresse" name="address" value={formData.address} onChange={this.handleInputChange} required />
+                  </div>
+                </div>
+
+                <h5 className="mt-3">Jours de travail</h5>
+                <div className="form-group mb-3">
+                  <div className="input-group">
+                    <span className="input-group-text"><FontAwesomeIcon icon={faCalendarAlt} /></span>
+                    <select className="form-control" value={formData.workDays.start} onChange={(e) => this.handleWorkDaysChange('start', e.target.value)} required>
+                      <option value="">Sélectionner un jour</option>
+                      {this.daysOfWeek.map((day) => <option key={day} value={day}>{day}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group mb-3">
+                  <div className="input-group">
+                    <span className="input-group-text"><FontAwesomeIcon icon={faCalendarAlt} /></span>
+                    <select className="form-control" value={formData.workDays.end} onChange={(e) => this.handleWorkDaysChange('end', e.target.value)} required>
+                      <option value="">Sélectionner un jour</option>
+                      {this.daysOfWeek.map((day) => <option key={day} value={day}>{day}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <h5 className="mt-3">Horaires de travail</h5>
+                <div className="form-group mb-3">
+                  <div className="input-group">
+                    <span className="input-group-text"><FontAwesomeIcon icon={faClock} /></span>
+                    <input type="time" className="form-control" value={formData.workHours.open} onChange={(e) => this.handleWorkHoursChange('open', e.target.value)} required />
+                  </div>
+                </div>
+
+                <div className="form-group mb-3">
+                  <div className="input-group">
+                    <span className="input-group-text"><FontAwesomeIcon icon={faClock} /></span>
+                    <input type="time" className="form-control" value={formData.workHours.close} onChange={(e) => this.handleWorkHoursChange('close', e.target.value)} required />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="form-group mb-3">
+              <div className="input-group">
+                <span className="input-group-text"><FontAwesomeIcon icon={faImage} /></span>
+                <input type="file" className="form-control" onChange={this.handleFileChange} />
+              </div>
             </div>
-            {/* Submit */}
-            <div className="form-group text-center mb-4 mt-3">
-              <input
-                type="submit"
-                value="S'inscrire"
-                className="btn btn-primary btn-block"
-              />
-              <p className="mt-3">
-                Déjà inscrit ? <a href="/signin" className="btn btn-link ">Se connecter</a>
-              </p>
-            </div>
+
+            <button type="submit" className="btn btn-primary btn-block">S'inscrire</button>
           </form>
-
-          {/* Message */}
-          <div className="form-group">
-            <span style={{ color: error ? 'red' : 'green' }}>{message}</span>
-          </div>
+          {message && <div className={`alert ${error ? 'alert-danger' : 'alert-success'} mt-3`}>{message}</div>}
         </div>
       </div>
     );

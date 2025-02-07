@@ -30,7 +30,7 @@ export function Navbar() {
               <Link className="nav-link" to="/dentists">Les Dentistes</Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" to="/about">À propos</Link>
+              <Link className="nav-link" to="/Apropos">À propos</Link>
             </li>
             <li className="nav-item">
               <Link className="nav-link" to="/contact">Contact</Link>

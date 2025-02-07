@@ -1,14 +1,19 @@
 const mongoose = require('mongoose');
+const User = require('./User'); // Importer le modèle User
 
-// Schéma pour les dentistes
 const DentistSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  specialization: { type: String, required: true },
   address: { type: String, required: true },
-  city: { type: String, required: true },
   phone: { type: String, required: true },
-  rating: { type: Number, required: true, min: 0, max: 10 },
-});
+  workDays: [{
+    start: { type: String }, // Jour de début
+    end: { type: String }    // Jour de fin
+  }],
+  workHours: {
+    open: { type: String }, // Heure d'ouverture
+    close: { type: String } // Heure de fermeture
+  },
+}, { _id: false });
+// Création du modèle Dentist en héritant de User
+const Dentist = User.discriminator('Dentist', DentistSchema);
 
-const Dentist = mongoose.model('Dentist', DentistSchema);
 module.exports = Dentist;
