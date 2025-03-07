@@ -8,9 +8,38 @@ function ArticleList({ articles }) {
   // Dupliquer les articles pour l'effet de défilement infini
   const duplicatedArticles = [...articles, ...articles];
 
+  // Styles inline pour le titre
+  const attractiveTitleStyle = {
+    fontSize: '2.0rem',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: '20px',
+    textTransform: 'uppercase',
+    letterSpacing: '2px',
+    background: 'linear-gradient(90deg, #3498db, #8e44ad)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    animation: 'shine 3s infinite',
+  };
+
+  // Styles inline pour l'animation
+  const shineAnimation = `
+    @keyframes shine {
+      0% { background-position: -200%; }
+      100% { background-position: 200%; }
+    }
+  `;
+
   return (
     <div className="article-list-container">
-      <h3>Articles dentaires à ne pas manquer</h3>
+      {/* Ajouter l'animation dans une balise <style> */}
+      <style>{shineAnimation}</style>
+
+      {/* Titre avec styles inline */}
+      <h6 style={attractiveTitleStyle}>
+        Découvrez Notre Sélection d'Articles Dentaires Essentiels
+      </h6>
       <br />
       <div
         className="article-list"

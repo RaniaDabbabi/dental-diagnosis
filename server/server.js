@@ -1,13 +1,17 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
-const path = require('path'); // Import du module path
+const bcrypt = require('bcrypt');
+const path = require('path'); 
 const multer = require('multer');
 const app = express();
 const PORT = 5000;
 const User = require('./models/User');
 const Dentist = require('./models/Dentist');
+const ChatConversation = require('./models/ChatConversation');
+const Chatbot = require('./models/Chatbot');
+const { appendFile } = require('fs/promises');
+const Notification = require('./models/Notification');
 
 // MongoDB Connection
 const mongoURI = 'mongodb://127.0.0.1:27017/dental_diagnostic';
@@ -18,14 +22,13 @@ mongoose
 
 // Configuration de Multer pour l'upload de fichiers
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+  destination: function (req, file, cb) {
+      cb(null, 'uploads/');
   },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  },
+  filename: function (req, file, cb) {
+      cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
 });
-
 const upload = multer({ storage });
 
 // Middleware
@@ -33,6 +36,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Générer un nom de chatbot unique
+const generateUniqueChatbotName = (username) => `${username}_bot_${Date.now()}`;
+
+// Créer une notification de bienvenue
+const createWelcomeNotification = async (userId) => {
+  const notification = new Notification({
+    sender: null, // Notification système
+    receiver: userId,
+    message: 'Bienvenue sur notre plateforme !',
+    status: 'read',
+  });
+  await notification.save();
+  return notification;
+};
 
 // Route pour l'inscription
 app.post('/api/signup', upload.single('image'), async (req, res) => {
@@ -48,7 +66,7 @@ app.post('/api/signup', upload.single('image'), async (req, res) => {
     // Hacher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Créer un nouvel utilisateur
+    // Créer les données utilisateur
     const userData = {
       username,
       password: hashedPassword,
@@ -56,74 +74,139 @@ app.post('/api/signup', upload.single('image'), async (req, res) => {
       firstname,
       lastname,
       city,
-      image: req.file ? req.file.path : null, // Chemin de l'image si elle existe
+      image: req.file ? req.file.path : null,
     };
 
+    let user;
+
     if (isDentist === 'true') {
-      // Vérifier que les champs spécifiques au dentiste sont fournis
       if (!phone || !address || !workDays || !workHours) {
         return res.status(400).json({ message: 'Missing required fields for dentist' });
       }
-
-      // Parser workDays et workHours en objets JavaScript
-      const parsedWorkDays = JSON.parse(workDays);
-      const parsedWorkHours = JSON.parse(workHours);
-
-      // Créer un dentiste
-      const dentist = new Dentist({
+      user = new Dentist({
         ...userData,
-        address,
         phone,
-        workDays: parsedWorkDays, // Tableau d'objets
-        workHours: parsedWorkHours, // Objet
+        address,
+        workDays: JSON.parse(workDays),
+        workHours: JSON.parse(workHours),
       });
-
-      await dentist.save();
-      return res.status(201).json({ message: 'Dentist registered successfully' });
     } else {
-      // Créer un utilisateur normal
-      const user = new User(userData);
-      await user.save();
-      return res.status(201).json({ message: 'User registered successfully' });
+      user = new User(userData);
     }
+
+    await user.save();
+
+    // Créer un chatbot
+    const chatbot = new Chatbot({
+      name: generateUniqueChatbotName(user.username),
+      description: `Chatbot personnel de ${user.username}`,
+      createdBy: user._id,
+      configuration: {},
+    });
+    await chatbot.save();
+
+    user.chatbot = chatbot._id;
+    await user.save();
+
+    // Créer une conversation vide
+    const conversation = new ChatConversation({
+      creator: user._id,
+      chatbot: chatbot._id,
+      participants: [user._id],
+      messages: [],
+    });
+    await conversation.save();
+
+    chatbot.conversations.push(conversation._id);
+    await chatbot.save();
+
+    // Envoyer une notification de bienvenue
+    const welcomeNotification = await createWelcomeNotification(user._id);
+    user.notifications.push(welcomeNotification._id);
+    await user.save();
+
+    res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
     console.error('Error during registration:', error);
     res.status(500).json({ message: 'Server error during registration', error: error.message });
   }
 });
 
-// Sign In Route
+
+const jwt = require('jsonwebtoken');
+const authMiddleware = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+
+  if (!token) {
+    return res.status(401).json({ message: 'Accès non autorisé' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Erreur de vérification du token :', error);
+    res.status(401).json({ message: 'Token invalide ou expiré' });
+  }
+};
+
+// Utilisation du middleware
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+    res.json({ user });
+  } catch (error) {
+    console.error('Erreur serveur :', error);
+    res.status(500).json({ message: 'Erreur de serveur' });
+  }
+});
 app.post('/api/signin', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Rechercher l'utilisateur dans la collection User
-    let user = await User.findOne({ username });
+    // Rechercher l'utilisateur
+    const user = await User.findOne({ username }).populate('notifications'); // Populate les notifications
 
-    // Si l'utilisateur n'est pas trouvé, rechercher dans la collection Dentist
-    if (!user) {
-      user = await Dentist.findOne({ username });
+    // Vérifier si l'utilisateur existe et si le mot de passe est correct
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ message: "Incorrect username or password." });
     }
 
-    // Si l'utilisateur n'existe pas
-    if (!user) {
-      return res.status(401).json({ message: 'Nom d\'utilisateur ou mot de passe incorrect.' });
-    }
+    // Définir le rôle
+    const role = user.role || 'User';
 
-    // Vérifier le mot de passe
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Nom d\'utilisateur ou mot de passe incorrect.' });
-    }
+    // **Générer le token JWT**
+    const token = jwt.sign(
+      { id: user._id, username: user.username, role: role },
+      process.env.JWT_SECRET || 'secretKey', // Utilise une clé secrète stockée dans une variable d’environnement
+      { expiresIn: '7d' } // Le token expire en 7 jours
+    );
 
-    // Renvoyer une réponse réussie
+    // Renvoyer les infos de l'utilisateur avec le token, l'ID du chatbot et les notifications
     res.status(200).json({
       message: 'Connexion réussie',
+      token, // Ajout du token ici
       user: {
         id: user._id,
+        firstName: user.firstname,
+        lastName: user.lastname,
         username: user.username,
         email: user.email,
-        role: user.role || 'User', // Si vous utilisez des discriminateurs
+        city: user.city,
+        image: user.image,
+        role: role,
+        chatbotId: user.chatbot, // Ajout de l'ID du chatbot
+        notifications: user.notifications, // Ajout des notifications
+        ...(role === 'Dentist' && {
+          phone: user.phone,
+          address: user.address,
+          workDays: user.workDays,
+          workHours: user.workHours,
+        }),
       },
     });
   } catch (error) {
@@ -132,7 +215,81 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
-/*
+
+app.put('/api/users/:id', upload.single('image'), async (req, res) => {
+  const { id } = req.params;
+  let { password, workDays, workHours, ...updateData } = req.body;
+
+  console.log("Données reçues :", req.body);
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "ID invalide." });
+  }
+
+  try {
+    // Vérifier si l'utilisateur existe
+    const existingUser = await User.findById(id);
+    if (!existingUser) {
+      return res.status(404).json({ message: "Utilisateur non trouvé." });
+    }
+
+    // Gérer la mise à jour du mot de passe
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+
+    // Gérer l'upload d'image
+    if (req.file) {
+      updateData.image = req.file.path; // Mettre à jour l'image de profil
+    }
+
+    // Vérifier si l'utilisateur est un dentiste et traiter les champs spécifiques
+    if (existingUser.role === 'Dentist') {
+      if (workDays) {
+        try {
+          updateData.workDays = JSON.parse(workDays); // Parser workDays
+        } catch (err) {
+          console.error("Erreur lors du parsing de workDays :", err);
+          return res.status(400).json({ message: 'Format invalide pour workDays' });
+        }
+      }
+
+      if (workHours) {
+        try {
+          updateData.workHours = JSON.parse(workHours); // Parser workHours
+        } catch (err) {
+          console.error("Erreur lors du parsing de workHours :", err);
+          return res.status(400).json({ message: 'Format invalide pour workHours' });
+        }
+      }
+    }
+
+    console.log("Données à mettre à jour :", updateData);
+
+    // Mise à jour de l'utilisateur
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { $set: updateData }, // Utiliser $set pour écraser les anciennes valeurs
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "Utilisateur non trouvé." });
+    }
+
+    console.log("Utilisateur mis à jour :", updatedUser);
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de l'utilisateur:", error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: "Erreur de serveur." });
+  }
+});
+
+
 app.post('/api/diagnostic', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -156,6 +313,165 @@ app.post('/api/diagnostic', upload.single('image'), async (req, res) => {
   }
 });
 
+
+/// Créer une nouvelle conversation
+app.post("/api/conversations/create", async (req, res) => {
+  try {
+    const { userId, chatbotId } = req.body;
+
+    // Vérifier si l'utilisateur existe
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    // Créer une nouvelle conversation
+    const newConversation = new ChatConversation({
+      creator: userId,
+      chatbot: chatbotId,
+      participants: [userId],
+      messages: [],
+    });
+
+    await newConversation.save();
+
+    res.status(201).json(newConversation);
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Erreur lors de la création de la conversation", error: error.message });
+  }
+});
+
+// Récupérer les conversations d'un utilisateur
+app.get("/api/conversations/user/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // Vérifier si l'utilisateur existe
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
+
+    // Récupérer toutes les conversations de l'utilisateur
+    const conversations = await ChatConversation.find({ creator: userId })
+      .populate("participants", "username firstname lastname") // Inclure les détails des participants
+      .populate("chatbot"); // Inclure les détails du chatbot
+
+    res.json(conversations);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+app.get("/api/conversations/:conversationId", authMiddleware, async (req, res) => {
+  try {
+    const conversation = await ChatConversation.findById(req.params.conversationId)
+      .populate("messages.sender", "username firstname lastname");
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation non trouvée" });
+    }
+
+    // Vérifiez que l'utilisateur est un participant
+    const userId = req.user.id; // Supposons que req.user est défini par le middleware d'authentification
+    if (!conversation.participants.includes(userId)) {
+      return res.status(403).json({ message: "Accès non autorisé" });
+    }
+
+    res.json(conversation);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+// Ajouter un message à une conversation
+app.post("/api/conversations/:conversationId/message", async (req, res) => {
+  try {
+    const { sender, message } = req.body;
+    const conversationId = req.params.conversationId;
+
+    // Vérifier si la conversation existe
+    const conversation = await ChatConversation.findById(conversationId);
+    if (!conversation) return res.status(404).json({ message: "Conversation introuvable" });
+
+    // Ajouter le message
+    conversation.messages.push({ sender, message, timestamp: new Date() });
+    await conversation.save();
+
+    res.json(conversation);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+// Récupérer les messages d'une conversation
+app.get("/api/conversations/:conversationId/messages", async (req, res) => {
+  try {
+    const conversationId = req.params.conversationId;
+
+    // Vérifier si la conversation existe
+    const conversation = await ChatConversation.findById(conversationId)
+      .populate("messages.sender", "username firstname lastname");
+
+    if (!conversation) return res.status(404).json({ message: "Conversation introuvable" });
+
+    res.json(conversation.messages);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+
+
+
+app.get("/api/notifications/user/:userId", async (req, res) => {
+  try {
+    const notifications = await Notification.find({ receiver: req.params.userId })
+      .sort({ timestamp: -1 }); // Trier par date décroissante
+
+    res.json(notifications);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+
+app.get('/api/dentists', async (req, res) => {
+  const { city } = req.query;
+
+  try {
+    // Construire la requête en fonction de la ville (si fournie)
+    let query = { __t: 'Dentist' }; // Filtrer uniquement les documents de type "Dentist"
+
+    // Récupérer les dentistes avec les informations du modèle User
+    const dentists = await User.find(query)
+      .select('name email city address phone workDays workHours') // Sélectionner les champs nécessaires
+      .exec();
+
+    // Formater la réponse
+    const formattedDentists = dentists.map((dentist) => ({
+      _id: dentist._id,
+      name: dentist.name,
+      email: dentist.email,
+      city: dentist.city,
+      address: dentist.address,
+      phone: dentist.phone,
+      workDays: dentist.workDays,
+      workHours: dentist.workHours
+    }));
+
+    res.json(formattedDentists);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des dentistes :', error);
+    res.status(500).json({ message: "Erreur du serveur", error });
+  }
+});
+/*
 // Exemple avec Express et MongoDB
 app.get('/api/dentists', (req, res) => {
   const { city } = req.query;

@@ -1,7 +1,7 @@
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faLock, faEnvelope, faIdCard, faCity, faPhone, faMapMarkerAlt, faCalendarAlt, faClock, faImage } from '@fortawesome/free-solid-svg-icons';
+import { faUser, faLock, faEnvelope, faIdCard, faCity, faPhone, faMapMarkerAlt, faClock, faImage } from '@fortawesome/free-solid-svg-icons';
 
 class SignUp extends React.Component {
   constructor(props) {
@@ -17,7 +17,7 @@ class SignUp extends React.Component {
         isDentist: false,
         phone: '',
         address: '',
-        workDays: { start: '', end: '' },
+        workDays: [], // Changement ici
         workHours: { open: '', close: '' },
         image: null,
       },
@@ -25,7 +25,7 @@ class SignUp extends React.Component {
       error: false,
     };
 
-    this.daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    this.daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     this.tunisianCities = [
       'Tunis', 'Sfax', 'Sousse', 'Kairouan', 'Gabès', 'Bizerte', 'Ariana', 'Gafsa', 'Monastir', 'Médenine',
       'Nabeul', 'Tataouine', 'Beja', 'Jendouba', 'Tozeur', 'Kasserine', 'Zarzis', 'Kebili', 'Mahdia', 'Siliana',
@@ -33,18 +33,21 @@ class SignUp extends React.Component {
     ];
   }
 
-  handleWorkDaysChange = (key, value) => {
-    this.setState((prevState) => ({
-      formData: {
-        ...prevState.formData,
-        workDays: {
-          ...prevState.formData.workDays,
-          [key]: value
-        }
-      }
-    }));
+  handleWorkDaysChange = (day, isChecked) => {
+    this.setState((prevState) => {
+      const { workDays } = prevState.formData;
+      const updatedWorkDays = isChecked
+        ? [...workDays, day]
+        : workDays.filter((d) => d !== day);
+  
+      return {
+        formData: {
+          ...prevState.formData,
+          workDays: updatedWorkDays,
+        },
+      };
+    });
   };
-
   handleWorkHoursChange = (key, value) => {
     this.setState((prevState) => ({
       formData: {
@@ -97,14 +100,14 @@ class SignUp extends React.Component {
   handleSubmit = async (e) => {
     e.preventDefault();
     const { formData } = this.state;
-
+  
     for (const field in formData) {
       if (field !== 'isDentist' && field !== 'phone' && field !== 'address' && field !== 'workDays' && field !== 'workHours' && field !== 'image' && !formData[field]) {
         this.setState({ message: 'Tous les champs obligatoires doivent être remplis.', error: true });
         return;
       }
     }
-
+  
     const formDataToSend = new FormData();
     Object.keys(formData).forEach((key) => {
       if (formData[key] instanceof File) {
@@ -115,13 +118,13 @@ class SignUp extends React.Component {
         formDataToSend.append(key, formData[key]);
       }
     });
-
+  
     try {
       const response = await fetch('http://localhost:5000/api/signup', {
         method: 'POST',
         body: formDataToSend,
       });
-
+  
       const data = await response.json();
       this.setState({ message: response.ok ? data.message : data.message || 'Erreur de serveur.', error: !response.ok });
     } catch (error) {
@@ -190,58 +193,80 @@ class SignUp extends React.Component {
             </div>
 
             {formData.isDentist && (
-              <>
-                <div className="form-group mb-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><FontAwesomeIcon icon={faPhone} /></span>
-                    <input type="text" className="form-control" placeholder="Téléphone" name="phone" value={formData.phone} onChange={this.handleInputChange} required />
-                  </div>
-                </div>
+  <>
+    <div className="form-group mb-3">
+      <div className="input-group">
+        <span className="input-group-text"><FontAwesomeIcon icon={faPhone} /></span>
+        <input type="text" className="form-control" placeholder="Téléphone" name="phone" value={formData.phone} onChange={this.handleInputChange} required />
+      </div>
+    </div>
 
-                <div className="form-group mb-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
-                    <input type="text" className="form-control" placeholder="Adresse" name="address" value={formData.address} onChange={this.handleInputChange} required />
-                  </div>
-                </div>
+    <div className="form-group mb-3">
+      <div className="input-group">
+        <span className="input-group-text"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
+        <input type="text" className="form-control" placeholder="Adresse" name="address" value={formData.address} onChange={this.handleInputChange} required />
+      </div>
+    </div>
 
-                <h5 className="mt-3">Jours de travail</h5>
-                <div className="form-group mb-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><FontAwesomeIcon icon={faCalendarAlt} /></span>
-                    <select className="form-control" value={formData.workDays.start} onChange={(e) => this.handleWorkDaysChange('start', e.target.value)} required>
-                      <option value="">Sélectionner un jour</option>
-                      {this.daysOfWeek.map((day) => <option key={day} value={day}>{day}</option>)}
-                    </select>
+    <h5 className="mt-3">Jours de travail</h5>
+    <div className="form-group mb-3">
+      <div className="row">
+        {this.daysOfWeek.map((day, index) => (
+          // Afficher deux jours par ligne
+          index % 2 === 0 && (
+            <div key={index} className="col-6">
+              <div className="d-flex flex-column">
+                {this.daysOfWeek.slice(index, index + 2).map((day) => (
+                  <div key={day} className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id={day}
+                      value={day}
+                      checked={formData.workDays.includes(day)}
+                      onChange={(e) => this.handleWorkDaysChange(day, e.target.checked)}
+                    />
+                    <label className="form-check-label" htmlFor={day}>{day}</label>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
 
-                <div className="form-group mb-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><FontAwesomeIcon icon={faCalendarAlt} /></span>
-                    <select className="form-control" value={formData.workDays.end} onChange={(e) => this.handleWorkDaysChange('end', e.target.value)} required>
-                      <option value="">Sélectionner un jour</option>
-                      {this.daysOfWeek.map((day) => <option key={day} value={day}>{day}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <h5 className="mt-3">Horaires de travail</h5>
-                <div className="form-group mb-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><FontAwesomeIcon icon={faClock} /></span>
-                    <input type="time" className="form-control" value={formData.workHours.open} onChange={(e) => this.handleWorkHoursChange('open', e.target.value)} required />
-                  </div>
-                </div>
-
-                <div className="form-group mb-3">
-                  <div className="input-group">
-                    <span className="input-group-text"><FontAwesomeIcon icon={faClock} /></span>
-                    <input type="time" className="form-control" value={formData.workHours.close} onChange={(e) => this.handleWorkHoursChange('close', e.target.value)} required />
-                  </div>
-                </div>
-              </>
-            )}
+    <h5 className="mt-3">Horaires de travail</h5>
+    <div className="form-group mb-3">
+      <div className="row">
+        <div className="col-6">
+          <div className="input-group">
+            <span className="input-group-text"><FontAwesomeIcon icon={faClock} /></span>
+            <input
+              type="time"
+              className="form-control"
+              value={formData.workHours.open}
+              onChange={(e) => this.handleWorkHoursChange('open', e.target.value)}
+              required
+            />
+          </div>
+        </div>
+        <div className="col-6">
+          <div className="input-group">
+            <span className="input-group-text"><FontAwesomeIcon icon={faClock} /></span>
+            <input
+              type="time"
+              className="form-control"
+              value={formData.workHours.close}
+              onChange={(e) => this.handleWorkHoursChange('close', e.target.value)}
+              required
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </>
+)}
 
             <div className="form-group mb-3">
               <div className="input-group">
@@ -252,8 +277,7 @@ class SignUp extends React.Component {
 
             <button type="submit" className="btn btn-primary btn-block">S'inscrire</button>
           </form>
-          {message && <div className={`alert ${error ? 'alert-danger' : 'alert-success'} mt-3`}>{message}</div>}
-        </div>
+          {message && <div className={`alert ${error ? 'alert-danger' : 'alert-success'} mt-3`}>{message}</div>}        </div>
       </div>
     );
   }

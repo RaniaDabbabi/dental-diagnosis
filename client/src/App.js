@@ -7,19 +7,16 @@ import HomePage from './home';
 import Chatbot from './Diagnostic'; 
 import { Navbar, Footer } from './layout';
 import DentistList from './Dentist';
-import AdminDentistManagement from './admin/AdminDentistManagement';
 import DentalCareArticle from './Home/Articles/Article1';
 import Article2 from './Home/Articles/Article2';
 import Article3 from './Home/Articles/Article3';
 import Apropos from'./Apropos';
+import DentistProfile from './Profile/DentistProfile';
+import UserProfile from './Profile/UserProfile';
+
 const isAuthenticated = () => {
   const user = JSON.parse(localStorage.getItem("user"));
   return user !== null;
-};
-
-const isAdmin = () => {
-  const user = JSON.parse(localStorage.getItem("user"));
-  return user && user.role === "admin";
 };
 
 function App() {
@@ -36,28 +33,19 @@ function App() {
             <Route path="/Home/Articles/Article2" element={<Article2 />} />
             <Route path="/Home/Articles/Article3" element={<Article3 />} />
             <Route path="/Apropos" element={<Apropos />} />
-
+            <Route path="/profile/dentist" element={<DentistProfile />} />
+            <Route path="/profile/user" element={<UserProfile />} />
             <Route
-              path="/diagnostic"
-              element={
-                isAuthenticated() ? (
-                  <Chatbot />
-                ) : (
-                  <Navigate to="/signin" replace />
-                )
-              }
-            />
+  path="/diagnostic/:chatbotId/:conversationId?"
+  element={
+    isAuthenticated() ? (
+      <Chatbot />
+    ) : (
+      <Navigate to="/signin" replace />
+    )
+  }
+/>
             <Route path="/dentists" element={<DentistList />} />
-            <Route
-              path="/admin/dentists"
-              element={
-                isAdmin() ? (
-                  <AdminDentistManagement />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

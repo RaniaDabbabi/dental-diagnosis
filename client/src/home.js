@@ -16,7 +16,7 @@ function HomePage() {
     {
       id: 1,
       title: "10 conseils d’un dentiste pour une bonne hygiène dentaire",
-      image: "/images/article1.jpeg",
+      image: "/images/images.jpeg",
       link: "/Home/Articles/Article1",
     },
     {
@@ -161,15 +161,29 @@ function HomePage() {
   };
 
   const handleStartClick = () => {
-    navigate('/diagnostic');
-    window.location.reload();
+    const token = localStorage.getItem('token');
+    const chatbotId = localStorage.getItem('chatbotId');
+  
+    if (!token) {
+      alert("Vous devez être connecté pour accéder au chatbot.");
+      navigate('/signin');
+      return;
+    }
+  
+    if (!chatbotId) {
+      alert("Aucun chatbot associé à cet utilisateur. Veuillez vous connecter.");
+      navigate('/signin');
+      return;
+    }
+  
+    navigate(`/diagnostic/${chatbotId}`);
   };
 
   return (
     <div>
       {/* Banner Section */}
-      <header className="bg-primary text-white text-center py-5">
-        <div className="container">
+      <header className="bg-primary text-white text-center py-5" style={{ background: "linear-gradient(135deg, #0b2b66, #1a53ff)" }}>
+        <div className="container" >
           <h1>Bienvenue sur Dental Diagnostic</h1>
           <p className="lead">Une solution intelligente pour vos besoins dentaires</p>
           <button onClick={handleStartClick} className="btn btn-light btn-lg mt-3">

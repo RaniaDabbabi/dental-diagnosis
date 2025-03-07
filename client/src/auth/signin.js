@@ -9,6 +9,7 @@ const SignIn = () => {
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   // Mettre à jour les champs du formulaire
@@ -25,53 +26,68 @@ const SignIn = () => {
     e.preventDefault();
     const { username, password } = formData;
 
-    // Vérifier que tous les champs sont remplis
     if (!username || !password) {
       setMessage('Tous les champs sont obligatoires.');
       setError(true);
       return;
     }
 
+    setLoading(true);
     try {
-      // Envoyer une requête POST au serveur
       const response = await fetch('http://localhost:5000/api/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
 
-      // Si la connexion est réussie
-      if (response.ok) {
-        // Stocker les informations de l'utilisateur dans le localStorage
-        const user = {
-          id: data.user.id,
-          username: data.user.username,
-          email: data.user.email,
-          role: data.user.role,
-        };
-        localStorage.setItem('user', JSON.stringify(user));
+      console.log("Réponse du serveur:", data);
 
-        // Afficher un message de succès
+      if (response.ok && data.token) {
+        // Stocker le token dans localStorage
+        localStorage.setItem('token', data.token);
+
+        // Stocker les informations de l'utilisateur dans localStorage
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Stocker l'ID du chatbot dans localStorage
+        if (data.user.chatbotId) {
+          localStorage.setItem('chatbotId', data.user.chatbotId);
+        }
+
+        // Stocker les notifications dans localStorage
+        if (data.user.notifications) {
+          localStorage.setItem('notifications', JSON.stringify(data.user.notifications));
+        }
+
         setMessage('Connexion réussie');
         setError(false);
-
-        // Rediriger vers la page d'accueil
-        navigate('/');
-        window.location.reload(); // Recharger la page pour mettre à jour l'état de l'application
+        setLoading(false);
+        navigate('/'); // Rediriger vers la page d'accueil
       } else {
-        // Afficher un message d'erreur
-        setMessage(data.message || 'Erreur de serveur.');
+        setMessage(data.message || 'Nom d\'utilisateur ou mot de passe incorrect.');
         setError(true);
+        setLoading(false);
       }
+      const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user'));
+const chatbotId = localStorage.getItem('chatbotId');
+const notifications = JSON.parse(localStorage.getItem('notifications'));
+
+console.log("Token:", token);
+console.log("Utilisateur:", user);
+console.log("ID du chatbot:", chatbotId);
+console.log("Notifications:", notifications);
     } catch (error) {
       console.error('Erreur de connexion au serveur:', error);
       setMessage('Erreur de connexion au serveur.');
       setError(true);
+      setLoading(false);
     }
+    
   };
 
   return (
@@ -119,11 +135,13 @@ const SignIn = () => {
 
         {/* Bouton de soumission */}
         <div className="form-group text-center mb-4">
-          <input
+          <button
             type="submit"
-            value="Se connecter"
             className="btn btn-primary btn-block"
-          />
+            disabled={loading}
+          >
+            {loading ? 'Connexion...' : 'Se connecter'}
+          </button>
           <p className="mt-3">
             Pas encore inscrit ?{' '}
             <a href="/signup" className="btn btn-link">
@@ -134,9 +152,11 @@ const SignIn = () => {
       </form>
 
       {/* Message */}
-      <div className="form-group">
-        <span style={{ color: error ? 'red' : 'green' }}>{message}</span>
-      </div>
+      {message && (
+        <div className="form-group text-center">
+          <span style={{ color: error ? 'red' : 'green' }}>{message}</span>
+        </div>
+      )}
     </div>
   );
 };
