@@ -1,299 +1,211 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import './styles.css';
-import { useParams, useNavigate } from 'react-router-dom'; 
 
-const Chatbot = () => {
-  const [isChatStarted, setIsChatStarted] = useState(false);
-  const [userMessage, setUserMessage] = useState('');
-  const [messages, setMessages] = useState([]);
+const ChatDiagnostic = () => {
   const [selectedImage, setSelectedImage] = useState(null);
-  const [conversations, setConversations] = useState([]);
-  const [user, setUser] = useState(null);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dentists, setDentists] = useState([]);
-  const [filteredDentists, setFilteredDentists] = useState([]);
-  const [selectedDentistId, setSelectedDentistId] = useState(null);
-  const [selectedDentistName, setSelectedDentistName] = useState('');
-  const { chatbotId, conversationId } = useParams(); // Récupère l'ID du chatbot et de la conversation depuis l'URL
-  const navigate = useNavigate(); // Utilisez useNavigate
+  const [previewImage, setPreviewImage] = useState(null);
+  const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [dentists, setDentists] = useState([]);
+  const [error, setError] = useState(null);
 
+  // Charger les messages de ChatDiagnostic au montage du composant
   useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem('token');
-      console.log("Token récupéré :", token); // Vérifiez si le token est présent
-  
-      if (!token) {
-        console.log("Token manquant, redirection vers /signin");
-        return (window.location.href = '/signin');
-      }
-  
+    const fetchChatDiagnostic = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/auth/me', {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Vous devez être connecté pour accéder à cette fonctionnalité.');
+          return;
+        }
+
+        const res = await axios.get('http://localhost:5000/api/chatdiagnostic', {
           headers: { Authorization: `Bearer ${token}` },
         });
-  
-        console.log("Réponse API :", response.data); // Vérifiez la réponse de l'API
-  
-        if (response.data?.user) {
-          setUser(response.data.user);
-          fetchConversations(response.data.user._id);
-        } else {
-          console.log("Utilisateur non trouvé, suppression du token et redirection...");
-          localStorage.removeItem('token');
-          window.location.href = '/signin';
-        }
+
+        const formattedMessages = res.data.map((msg) => ({
+          type: msg.image ? 'user' : 'bot',
+          image: msg.image || null,
+          text: msg.response || null,
+        }));
+
+        setHistory(formattedMessages);
       } catch (error) {
-        console.error('Erreur utilisateur:', error);
-        localStorage.removeItem('token');
-        window.location.href = '/signin';
+        console.error('Erreur lors de la récupération des messages :', error);
+        setError('Échec de la récupération des messages.');
       }
     };
-  
-    fetchUser();
+
+    fetchChatDiagnostic();
   }, []);
-
-  useEffect(() => {
-    const fetchDentists = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/api/dentists');
-        setDentists(response.data);
-        setFilteredDentists(response.data);
-      } catch (error) {
-        console.error('Erreur lors du chargement des dentistes :', error);
-      }
-    };
-  
-    fetchDentists();
-  }, []);
-
-  useEffect(() => {
-    if (conversationId && user?.chatbot) {
-      loadConversation(conversationId);
-    }
-  }, [conversationId, user?.chatbot]);
-
-  useEffect(() => {
-    const filtered = dentists.filter((dentist) =>
-      dentist.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredDentists(filtered);
-  }, [searchQuery, dentists]);
-
-  useEffect(() => {
-    if (conversationId && user?.chatbot) {
-      loadConversation(conversationId);
-    }
-  }, [conversationId, user?.chatbot]);
-
-  const fetchConversations = useCallback(async (userId) => {
-    if (!userId) return;
-    setIsLoading(true);
-    try {
-      const response = await axios.get(`http://localhost:5000/api/conversations/user/${userId}`);
-      setConversations(response.data || []);
-    } catch (error) {
-      console.error('Erreur conversations:', error);
-      alert('Erreur lors du chargement des conversations.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleDentistShare = (dentistId) => {
-    const selectedDentist = dentists.find((dentist) => dentist._id === dentistId);
-    if (selectedDentist) {
-      setSelectedDentistId(dentistId);
-      setSelectedDentistName(selectedDentist.name);
-      setIsConfirmationDialogOpen(true);
-    }
-  };
-
-  const confirmShare = async () => {
-    try {
-      await axios.post('http://localhost:5000/api/conversations/share', {
-        conversationId: conversationId,
-        dentistId: selectedDentistId,
-      });
-      alert('Conversation partagée avec succès !');
-      setIsConfirmationDialogOpen(false);
-      setIsShareDialogOpen(false);
-    } catch (error) {
-      console.error('Erreur lors du partage :', error);
-      alert('Erreur lors du partage de la conversation.');
-    }
-  };
-
-  const startNewConversation = async () => {
-    if (!user || !user.chatbot) return;
-    try {
-      const response = await axios.post('http://localhost:5000/api/conversations/create', {
-        userId: user._id,
-        chatbotId: user.chatbot,
-      });
-      if (response.data) {
-        setIsChatStarted(true);
-        setMessages([]);
-        setConversations([...conversations, response.data]);
-        // Rediriger vers l'URL de la nouvelle conversation
-        navigate(`/diagnostic/${user.chatbot}/${response.data._id}`);
-      }
-    } catch (error) {
-      console.error('Erreur création conversation:', error);
-    }
-  };
-
-  const loadConversation = async (conversationId) => {
-    console.log("Chargement de la conversation avec l'ID :", conversationId);
-    try {
-      const response = await axios.get(`http://localhost:5000/api/conversations/${conversationId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      console.log("Réponse du serveur :", response.data);
-      setMessages(response.data.messages || []);
-      setIsChatStarted(true);
-  
-      // Mettre à jour l'URL
-      if (window.location.pathname !== `/diagnostic/${user.chatbot}/${conversationId}`) {
-        navigate(`/diagnostic/${user.chatbot}/${conversationId}`);
-      }
-    } catch (error) {
-      console.error('Erreur chargement conversation:', error);
-      alert('Erreur lors du chargement de la conversation. Veuillez réessayer.');
-    }
-  };
-  const sendMessage = async () => {
-    if (!userMessage.trim() && !selectedImage) return;
-
-    if (conversations.length === 0) return;
-    const activeConversation = conversations[conversations.length - 1];
-    if (!activeConversation) return;
-
-    try {
-      const response = await axios.post(
-        `http://localhost:5000/api/conversations/${activeConversation._id}/message`,
-        { sender: user._id, message: userMessage }
-      );
-      setMessages([...messages, response.data.message]);
-    } catch (error) {
-      console.error('Erreur envoi message:', error);
-    }
-
-    setUserMessage('');
-    if (selectedImage) setSelectedImage(null);
-  };
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
-    if (file) setSelectedImage(file);
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("L'image ne doit pas dépasser 5 Mo.");
+        return;
+      }
+      setSelectedImage(file);
+      setPreviewImage(URL.createObjectURL(file));
+      setError(null);
+    }
   };
 
-  const handleShareConversation = () => {
-    if (conversations.length === 0) return;
-    const activeConversation = conversations[conversations.length - 1];
-    if (!activeConversation) return;
+  const sendImageForDiagnosis = useCallback(async () => {
+    if (!selectedImage) {
+      setError('Veuillez sélectionner une image.');
+      return;
+    }
 
-    const conversationLink = `http://localhost:3000/conversation/${activeConversation._id}`;
-    navigator.clipboard.writeText(conversationLink)
-      .then(() => {
-        alert("Lien de la conversation copié dans le presse-papiers !");
-      })
-      .catch((error) => {
-        console.error("Erreur lors de la copie du lien :", error);
+    setIsLoading(true);
+    setError(null);
+    
+    const formData = new FormData();
+    formData.append('image', selectedImage);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Vous devez être connecté pour effectuer cette action.');
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await axios.post('http://localhost:5000/api/diagnostic', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
+        },
       });
-    setIsShareDialogOpen(true);
-  };
 
+      setHistory((prevHistory) => [
+        ...prevHistory,
+        { type: 'user', image: previewImage },
+        { type: 'bot', text: response.data.diagnostic.diagnosis },
+      ]);
 
-return (
-    <div id="app-container">
-      <div id="sidebar">
-        <div id="sidebar-header">Conversations</div>
-        <button id="new-chat-btn" onClick={startNewConversation}>Nouvelle Conversation</button>
-        <ul id="conversation-list">
-          {conversations.map((conv) => (
-            <li key={conv._id} className="conversation-item" onClick={() => loadConversation(conv._id)}>
-              {conv.title || "Nouvelle Conversation"}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div id="chat-container">
-        {!isChatStarted ? (
-          <div id="start-screen">
-            <h1>Bienvenue chez Assistant Dentaire</h1>
-            <button id="start-chat-btn" onClick={startNewConversation}>Nouvelle Conversation</button>
-          </div>
-        ) : (
-          <>
-            <div id="chat-header">
-              <span>Assistant Dentaire</span>
-              <button id="share-btn" onClick={handleShareConversation}>Partager</button>
-            </div>
-            <div id="chat-history">
-              {messages.map((msg, index) => (
-                <div key={index} className={msg.sender === user?._id ? 'user-message' : 'bot-message'}>
-                  <p>{msg.message}</p>
-                </div>
-              ))}
-            </div>
-            <div id="chat-input-container">
-              <input
-                type="text"
-                placeholder="Entrez votre message..."
-                value={userMessage}
-                onChange={(e) => setUserMessage(e.target.value)}
-                id="userMessage"
-              />
-              <div id="input-buttons">
-                <label htmlFor="photoUpload" id="uploadBtn">📷</label>
-                <input type="file" id="photoUpload" accept="image/*" onChange={handleImageUpload} hidden />
-                <button id="sendMessageBtn" onClick={sendMessage}>Envoyer</button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      setSelectedImage(null);
+      setPreviewImage(null);
+    } catch (error) {
+      console.error('Erreur:', error);
+      setError('Échec du diagnostic. Veuillez réessayer.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedImage, previewImage]);
 
-      {/* Boîte de dialogue de partage */}
-      {isShareDialogOpen && (
+  const ShareDialog = ({ show, dentists, onClose, onShare }) => {
+    const [selectedDentist, setSelectedDentist] = useState('');
+
+    return (
+      show && (
         <div id="share-dialog">
           <div id="share-dialog-content">
-            <h3>Partager la conversation</h3>
-            <input
-              type="text"
-              placeholder="Rechercher un dentiste..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <ul id="dentist-list">
-              {filteredDentists.map((dentist) => (
-                <li key={dentist._id} className="dentist-item">
-                  <span>{dentist.name}</span>
-                  <button onClick={() => handleDentistShare(dentist._id)}>Partager</button>
-                </li>
+            <h3>Partager avec un dentiste</h3>
+            <select onChange={(e) => setSelectedDentist(e.target.value)} value={selectedDentist}>
+              <option value="">Sélectionnez un dentiste</option>
+              {dentists.map(dentist => (
+                <option key={dentist._id} value={dentist._id}>{dentist.username}</option>
               ))}
-            </ul>
-            <button id="close-share-dialog" onClick={() => setIsShareDialogOpen(false)}>Fermer</button>
+            </select>
+            <div className="dialog-buttons">
+              <button onClick={() => onShare(selectedDentist)}>Partager</button>
+              <button onClick={onClose}>Fermer</button>
+            </div>
           </div>
         </div>
-      )}
+      )
+    );
+  };
 
-      {/* Boîte de dialogue de confirmation */}
-      {isConfirmationDialogOpen && (
-        <div id="confirmation-dialog">
-          <div id="confirmation-dialog-content">
-            <p>Voulez-vous vraiment partager cette conversation avec {selectedDentistName} ?</p>
-            <button onClick={confirmShare}>Confirmer</button>
-            <button onClick={() => setIsConfirmationDialogOpen(false)}>Annuler</button>
-          </div>
+  const openShareDialog = async () => {
+    setShowShareDialog(true);
+    try {
+      const response = await axios.get('http://localhost:5000/api/dentists');
+      setDentists(response.data);
+    } catch (error) {
+      console.error('Erreur:', error);
+      setError('Échec du chargement des dentistes.');
+    }
+  };
+
+  const shareChatWithDentist = useCallback(async (dentistId) => {
+    if (!dentistId) {
+      setError('Veuillez sélectionner un dentiste.');
+      return;
+    }
+
+    try {
+      await axios.post('http://localhost:5000/api/shareChat', {
+        dentistId,
+        chatHistory: history,
+      });
+      setShowShareDialog(false);
+    } catch (error) {
+      console.error('Erreur:', error);
+      setError('Échec du partage. Réessayez.');
+    }
+  }, [history]);
+
+  return (
+    <div id="app-container">
+      <div id="chat-container">
+        <div id="chat-header">
+          Assistant Dentaire - Diagnostic
+          <button id="share-btn" onClick={openShareDialog}>Partager</button>
         </div>
-      )}
+
+        {error && (
+          <div className="error-message">
+            <p>{error}</p>
+            <button onClick={() => setError(null)}>Fermer</button>
+          </div>
+        )}
+
+        <div id="chat-history">
+          {history.map((message, index) => (
+            <div key={index} className={`message-container ${message.type === 'user' ? 'user-message-container' : 'bot-message-container'}`}>
+              {message.image && (
+                <div className="image-container">
+                  <img src={message.image} alt="Envoyé" className="message-image" />
+                </div>
+              )}
+              {message.text && (
+                <div className="text-container">
+                  <p>{message.text}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {previewImage && (
+          <div className="preview-container">
+            <p>Aperçu :</p>
+            <img src={previewImage} alt="Aperçu" className="preview-image" />
+          </div>
+        )}
+
+        <div id="chat-input-container">
+          <label htmlFor="photoUpload" id="uploadBtn">📷</label>
+          <input type="file" id="photoUpload" accept="image/*" onChange={handleImageUpload} hidden />
+          <button id="sendImageBtn" onClick={sendImageForDiagnosis} disabled={isLoading}>
+            {isLoading ? <div className="spinner"></div> : 'Envoyer'}
+          </button>
+        </div>
+      </div>
+
+      <ShareDialog
+        show={showShareDialog}
+        dentists={dentists}
+        onClose={() => setShowShareDialog(false)}
+        onShare={shareChatWithDentist}
+      />
     </div>
   );
 };
 
-export default Chatbot;
+export default ChatDiagnostic;

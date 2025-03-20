@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './HomePage.css';
 import VideoList from './Home/VideoList';
 import ArticleList from './Home/ArticleList';
 
-
 function HomePage() {
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [currentNode, setCurrentNode] = useState("start");
-  const [conversation, setConversation] = useState([]);
   const navigate = useNavigate();
+
+  // Vérification de l'utilisateur
+  let user = null;
+  try {
+    user = JSON.parse(localStorage.getItem('user')) || null;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'utilisateur :", error);
+  }
 
   // Exemple de données pour les articles et les vidéos
   const articles = [
@@ -31,9 +35,8 @@ function HomePage() {
       image: "/images/article3.jpeg",
       link: "/Home/Articles/Article3",
     },
-  
   ];
-  
+
   const videos = [
     {
       title: "Comment faut-il se brosser les DENTS",
@@ -56,127 +59,60 @@ function HomePage() {
       link: "/Videos/V5.mp4",
     },
   ];
-  // Data structure to manage chatbot questions and options
-  const chatData = {
-    start: {
-      question: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
-      options: [
-        { text: "Qu'est-ce qu'une carie ?", next: "carie" },
-        { text: "Comment prévenir les caries ?", next: "prevention" },
-        { text: "Quand consulter un dentiste ?", next: "consultation" },
-      ],
-    },
-    carie: {
-      question: "Une carie est une lésion de la dent causée par des bactéries. Voulez-vous en savoir plus ?",
-      options: [
-        { text: "Quels sont les symptômes ?", next: "symptomes" },
-        { text: "Comment la traiter ?", next: "traitement" },
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    prevention: {
-      question: "Pour prévenir les caries : brossez vos dents deux fois par jour, limitez les sucres, consultez régulièrement un dentiste.",
-      options: [
-        { text: "En savoir plus sur le brossage", next: "brossage" },
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    consultation: {
-      question: "Consultez un dentiste si vous avez des douleurs, des saignements ou des caries visibles.",
-      options: [
-        { text: "Comment choisir un bon dentiste ?", next: "choisirDentiste" },
-        { text: "Trouver un dentiste proche", next: "trouverDentiste" },
-        { text: "Obtenir un diagnostic", next: "diagnostic" },
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    choisirDentiste: {
-      question: "Pour choisir un bon dentiste : \n1. Vérifiez ses qualifications et certifications.\n2. Consultez les avis des patients.\n3. Assurez-vous qu'il utilise un matériel moderne.",
-      options: [
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    trouverDentiste: {
-      question: "Pour trouver un dentiste proche, utilisez notre outil de recherche en ligne ou des applications de localisation comme Google Maps.",
-      options: [
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    diagnostic: {
-      question: "Souhaitez-vous un diagnostic rapide ou détaillé ?",
-      options: [
-        { text: "Diagnostic rapide (photo réelle)", next: "diagnosticRapide" },
-        { text: "Diagnostic détaillé (radiographie)", next: "diagnosticDetaille" },
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    diagnosticRapide: {
-      question: "Envoyez une photo réelle de vos dents. Un diagnostic rapide sera généré en quelques secondes.",
-      options: [
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    diagnosticDetaille: {
-      question: "Téléchargez une radiographie de vos dents. Un diagnostic détaillé vous sera fourni.",
-      options: [
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    symptomes: {
-      question: "Les symptômes d'une carie incluent : douleur, sensibilité, taches noires ou blanches sur la dent.",
-      options: [
-        { text: "Comment la traiter ?", next: "traitement" },
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    traitement: {
-      question: "Le traitement peut inclure : un plombage, une couronne ou une extraction selon la gravité.",
-      options: [
-        { text: "Puis-je éviter les plombages ?", next: "eviterPlombages" },
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-    eviterPlombages: {
-      question: "Vous pouvez éviter les plombages en détectant les caries tôt et en améliorant votre hygiène bucco-dentaire.",
-      options: [
-        { text: "Retour à l'accueil", next: "start" },
-      ],
-    },
-  };
 
-  // Function to toggle the chatbot window
-  const toggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-  };
-
-  // Function to handle option selection
-  const handleOptionClick = (next) => {
-    const currentData = chatData[currentNode];
-    setConversation([
-      ...conversation,
-      { question: currentData.question, answer: currentData.options.find((opt) => opt.next === next).text },
-    ]);
-
-    setCurrentNode(next); 
-  };
-
-  const handleStartClick = () => {
+  const handleStartClick = async () => {
     const token = localStorage.getItem('token');
-    const chatbotId = localStorage.getItem('chatbotId');
-  
+    let chatdiagnosticId = localStorage.getItem('chatdiagnosticId');
+
     if (!token) {
-      alert("Vous devez être connecté pour accéder au chatbot.");
+      alert("Vous devez être connecté pour accéder au chatdiagnostic.");
       navigate('/signin');
       return;
     }
-  
-    if (!chatbotId) {
-      alert("Aucun chatbot associé à cet utilisateur. Veuillez vous connecter.");
+
+    // Ensure the user object and its _id property are defined
+    if (!user || !user._id) {
+      alert("Erreur : ID utilisateur invalide. Veuillez vous reconnecter.");
       navigate('/signin');
       return;
     }
-  
-    navigate(`/diagnostic/${chatbotId}`);
+
+    // If chatdiagnosticId exists, redirect to the chat
+    if (chatdiagnosticId) {
+      navigate(`/diagnostic/${chatdiagnosticId}`);
+      return;
+    }
+
+    // Create or retrieve a ChatDiagnostic
+    try {
+      console.log('Envoi de la requête avec le corps :', { user: user._id });
+
+      const response = await fetch('http://localhost:5000/api/chatdiagnostic', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user: user._id }), // Ensure user._id is sent
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erreur du serveur :', errorData);
+        throw new Error(errorData.message || `Erreur HTTP: ${response.status}`);
+      }
+
+      const data = await response.json(); // Parse the response JSON
+      console.log('Réponse du serveur :', data);
+
+      // Save the chatdiagnosticId in localStorage and redirect
+      chatdiagnosticId = data.chatDiagnostic._id;
+      localStorage.setItem('chatdiagnosticId', chatdiagnosticId);
+      navigate(`/diagnostic/${chatdiagnosticId}`);
+    } catch (error) {
+      console.error("Erreur lors de la création du chatdiagnostic :", error);
+      alert(`Impossible de créer le chatdiagnostic : ${error.message}`);
+    }
   };
 
   return (
@@ -192,14 +128,15 @@ function HomePage() {
         </div>
       </header>
 
-    <br/>  
+      <br/>  
       {/* Article List Section */}
       <section className="bg-light py-5">
         <div className="container">
           <ArticleList articles={articles} />
         </div>
       </section>
-<br/>
+      <br/>
+
       {/* Video List Section */}
       <section className="bg-light py-5">
         <div className="container">
@@ -208,17 +145,18 @@ function HomePage() {
       </section>
       <br/>
 
-{/* About Section */}
-<section className="py-5">
-  <div className="container text-center">
-    <h2>À propos de nous</h2>
-    <p className="lead">
-      Dental Diagnostic est une plateforme innovante qui utilise l'intelligence artificielle pour révolutionner les soins dentaires. Nous proposons des conseils de santé et des vidéos éducatives sur des thématiques comme la prévention, les traitements et l'hygiène quotidienne. Notre chatbot interactif répond à vos questions, vous guide dans l'utilisation de la plateforme et permet même l'envoi de photos pour une analyse rapide. Grâce à notre IA, nous détectons des anomalies dentaires telles que les caries, les inflammations ou les fractures, et générons un rapport détaillé avec des recommandations personnalisées. De plus, nous vous aidons à trouver les dentistes les plus proches grâce à un système de recommandation basé sur votre localisation, avec des profils détaillés incluant leurs spécialités, horaires et avis des patients. Enfin, vous pouvez partager votre diagnostic directement avec votre dentiste via un lien sécurisé, facilitant ainsi un suivi personnalisé. Dental Diagnostic s'engage à rendre les soins dentaires modernes, accessibles et efficaces pour tous.
-    </p>
-  </div>
-</section>      
-{/* Features Section */}
-<section className="bg-light py-5">
+      {/* About Section */}
+      <section className="py-5">
+        <div className="container text-center">
+          <h2>À propos de nous</h2>
+          <p className="lead">
+            Dental Diagnostic est une plateforme innovante qui utilise l'intelligence artificielle pour révolutionner les soins dentaires. Nous proposons des conseils de santé et des vidéos éducatives sur des thématiques comme la prévention, les traitements et l'hygiène quotidienne. Notre chatbot interactif répond à vos questions, vous guide dans l'utilisation de la plateforme et permet même l'envoi de photos pour une analyse rapide. Grâce à notre IA, nous détectons des anomalies dentaires telles que les caries, les inflammations ou les fractures, et générons un rapport détaillé avec des recommandations personnalisées. De plus, nous vous aidons à trouver les dentistes les plus proches grâce à un système de recommandation basé sur votre localisation, avec des profils détaillés incluant leurs spécialités, horaires et avis des patients. Enfin, vous pouvez partager votre diagnostic directement avec votre dentiste via un lien sécurisé, facilitant ainsi un suivi personnalisé. Dental Diagnostic s'engage à rendre les soins dentaires modernes, accessibles et efficaces pour tous.
+          </p>
+        </div>
+      </section>      
+
+      {/* Features Section */}
+      <section className="bg-light py-5">
         <div className="container">
           <h2 className="text-center">Nos fonctionnalités</h2>
           <div className="row text-center mt-4">
@@ -240,45 +178,6 @@ function HomePage() {
           </div>
         </div>
       </section>
-      {/* Chatbot Bubble */}
-      <div className="chat-bubble" onClick={toggleChat}>
-        <i className="bi bi-chat-dots-fill"></i>
-      </div>
-
-      {/* Chat Window */}
-      {isChatOpen && (
-        <div className="chat-window">
-          <div className="chat-header">
-            <h5>Chatbot Médical</h5>
-            <button className="close-btn" onClick={toggleChat}>
-              X
-            </button>
-          </div>
-          <div className="chat-body">
-            {/* Display conversation history */}
-            <div className="conversation">
-              {conversation.map((entry, index) => (
-                <div key={index}>
-                  <p><strong>Question :</strong> {entry.question}</p>
-                  <p><strong>Réponse :</strong> {entry.answer}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Display current question */}
-            <p>{chatData[currentNode].question}</p>
-            {chatData[currentNode].options.map((option, index) => (
-              <button
-                key={index}
-                className="chat-option"
-                onClick={() => handleOptionClick(option.next)}
-              >
-                {option.text}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import SignUp from './auth/signup';
 import SignIn from './auth/signin';
 import NotFound from './NotFound';
 import HomePage from './home';
-import Chatbot from './Diagnostic'; 
+import ChatDiagnostic from './Diagnostic'; 
 import { Navbar, Footer } from './layout';
 import DentistList from './Dentist';
 import DentalCareArticle from './Home/Articles/Article1';
@@ -13,6 +13,7 @@ import Article3 from './Home/Articles/Article3';
 import Apropos from'./Apropos';
 import DentistProfile from './Profile/DentistProfile';
 import UserProfile from './Profile/UserProfile';
+import FloatingChatbot from './FloatingChatbot';
 
 const isAuthenticated = () => {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -35,23 +36,18 @@ function App() {
             <Route path="/Apropos" element={<Apropos />} />
             <Route path="/profile/dentist" element={<DentistProfile />} />
             <Route path="/profile/user" element={<UserProfile />} />
-            <Route
-  path="/diagnostic/:chatbotId/:conversationId?"
-  element={
-    isAuthenticated() ? (
-      <Chatbot />
-    ) : (
-      <Navigate to="/signin" replace />
-    )
-  }
+            <Route path="/diagnostic/:chatdiagnosticId"
+  element={isAuthenticated() ? <ChatDiagnostic /> : <Navigate to="/signin" replace />}
 />
             <Route path="/dentists" element={<DentistList />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
         <Footer />
+        <FloatingChatbot />
       </div>
     </Router>
+    
   );
 }
 

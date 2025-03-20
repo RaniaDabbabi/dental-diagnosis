@@ -61,7 +61,7 @@ def get_random_description(class_name):
 
 # Route pour le diagnostic
 @app.route('/diagnostic', methods=['POST'])
-def get_diagnostic():
+def diagnostic():
     if 'image' not in request.files:
         return jsonify({"error": "No image file found"}), 400
 

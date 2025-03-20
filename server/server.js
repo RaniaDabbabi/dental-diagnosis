@@ -2,34 +2,51 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
-const path = require('path'); 
+const path = require('path');
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+const FormData = require('form-data');
+require('dotenv').config();
+const fs = require('fs');
 const app = express();
 const PORT = 5000;
+
 const User = require('./models/User');
 const Dentist = require('./models/Dentist');
 const ChatConversation = require('./models/ChatConversation');
-const Chatbot = require('./models/Chatbot');
-const { appendFile } = require('fs/promises');
+const ChatbotConversation = require('./models/ChatbotConversation');
+const ChatDiagnostic = require('./models/ChatDiagnostic');
 const Notification = require('./models/Notification');
+const DossierMedical = require('./models/DossierMedical');
 
-// MongoDB Connection
-const mongoURI = 'mongodb://127.0.0.1:27017/dental_diagnostic';
-mongoose
-  .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('Error connecting to MongoDB:', err));
+mongoose.connect('mongodb://127.0.0.1:27017/dental_diagnostic', { 
+  useNewUrlParser: true, 
+  useUnifiedTopology: true 
+})
+  .then(() => console.log('✅ MongoDB connecté'))
+  .catch(err => console.error('❌ Erreur de connexion MongoDB:', err));
 
-// Configuration de Multer pour l'upload de fichiers
+// Configuration de Multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-      cb(null, 'uploads/');
+    cb(null, 'uploads/'); // Dossier de destination pour les fichiers uploadés
   },
   filename: function (req, file, cb) {
-      cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+    cb(null, Date.now() + path.extname(file.originalname)); // Nom du fichier
   }
 });
-const upload = multer({ storage });
+
+// Filtre pour accepter uniquement les images JPG, JPEG et PNG
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true); // Accepter le fichier
+  } else {
+    cb(new Error('Seules les images JPG, JPEG et PNG sont autorisées.'), false); // Rejeter le fichier
+  }
+};
+const upload = multer({ storage, fileFilter });
 
 // Middleware
 app.use(cors());
@@ -37,36 +54,36 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Générer un nom de chatbot unique
-const generateUniqueChatbotName = (username) => `${username}_bot_${Date.now()}`;
-
-// Créer une notification de bienvenue
-const createWelcomeNotification = async (userId) => {
-  const notification = new Notification({
-    sender: null, // Notification système
-    receiver: userId,
-    message: 'Bienvenue sur notre plateforme !',
-    status: 'read',
-  });
-  await notification.save();
-  return notification;
-};
-
-// Route pour l'inscription
-app.post('/api/signup', upload.single('image'), async (req, res) => {
-  const { username, password, email, firstname, lastname, city, isDentist, phone, address, workDays, workHours } = req.body;
+// 🔒 Middleware JWT pour l'authentification
+const authMiddleware = (req, res, next) => {
+  // Récupérer le token de l'en-tête Authorization
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ message: 'Accès refusé. Token manquant.' });
+  }
 
   try {
+    // Vérifier et décoder le token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
+    req.user = decoded; // Ajouter l'utilisateur décodé à la requête
+    next();
+  } catch (error) {
+    console.error('Erreur de vérification du token:', error);
+    res.status(401).json({ message: 'Token invalide ou expiré' });
+  }
+};
+// 🆕 Route d'inscription
+app.post('/api/signup', upload.single('image'), async (req, res) => {
+  try {
+    const { username, password, email, firstname, lastname, city, isDentist, phone, address, workDays, workHours } = req.body;
+
     // Vérifier si l'utilisateur existe déjà
-    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Username or email already exists' });
+    if (await User.findOne({ $or: [{ username }, { email }] })) {
+      return res.status(400).json({ message: 'Nom d’utilisateur ou email déjà existant.' });
     }
 
-    // Hacher le mot de passe
+    // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Créer les données utilisateur
     const userData = {
       username,
       password: hashedPassword,
@@ -78,10 +95,9 @@ app.post('/api/signup', upload.single('image'), async (req, res) => {
     };
 
     let user;
-
-    if (isDentist === 'true') {
+    if (JSON.parse(isDentist)) {
       if (!phone || !address || !workDays || !workHours) {
-        return res.status(400).json({ message: 'Missing required fields for dentist' });
+        return res.status(400).json({ message: 'Champs obligatoires manquants pour un dentiste.' });
       }
       user = new Dentist({
         ...userData,
@@ -94,369 +110,306 @@ app.post('/api/signup', upload.single('image'), async (req, res) => {
       user = new User(userData);
     }
 
-    await user.save();
+    // Enregistrement de l'utilisateur
+    const savedUser = await user.save();
 
-    // Créer un chatbot
-    const chatbot = new Chatbot({
-      name: generateUniqueChatbotName(user.username),
-      description: `Chatbot personnel de ${user.username}`,
-      createdBy: user._id,
-      configuration: {},
-    });
-    await chatbot.save();
-
-    user.chatbot = chatbot._id;
-    await user.save();
-
-    // Créer une conversation vide
-    const conversation = new ChatConversation({
-      creator: user._id,
-      chatbot: chatbot._id,
-      participants: [user._id],
-      messages: [],
-    });
-    await conversation.save();
-
-    chatbot.conversations.push(conversation._id);
-    await chatbot.save();
-
-    // Envoyer une notification de bienvenue
-    const welcomeNotification = await createWelcomeNotification(user._id);
-    user.notifications.push(welcomeNotification._id);
-    await user.save();
-
-    res.status(201).json({ message: 'User registered successfully', user });
+    res.status(201).json({ message: 'Utilisateur enregistré avec succès', user: savedUser });
   } catch (error) {
-    console.error('Error during registration:', error);
-    res.status(500).json({ message: 'Server error during registration', error: error.message });
+    console.error('Erreur lors de l\'inscription:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
 });
 
-
-const jwt = require('jsonwebtoken');
-const authMiddleware = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
-
-  if (!token) {
-    return res.status(401).json({ message: 'Accès non autorisé' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
-    req.user = decoded;
-    next();
-  } catch (error) {
-    console.error('Erreur de vérification du token :', error);
-    res.status(401).json({ message: 'Token invalide ou expiré' });
-  }
-};
-
-// Utilisation du middleware
-app.get('/api/auth/me', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
-    res.json({ user });
-  } catch (error) {
-    console.error('Erreur serveur :', error);
-    res.status(500).json({ message: 'Erreur de serveur' });
-  }
-});
+// **Route de connexion**
 app.post('/api/signin', async (req, res) => {
   const { username, password } = req.body;
 
-  try {
-    // Rechercher l'utilisateur
-    const user = await User.findOne({ username }).populate('notifications'); // Populate les notifications
+  // Validation des entrées
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Tous les champs sont obligatoires.' });
+  }
 
-    // Vérifier si l'utilisateur existe et si le mot de passe est correct
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Incorrect username or password." });
+  try {
+    // Rechercher l'utilisateur dans la base de données
+    const user = await User.findOne({ username }).populate('notifications');
+    if (!user) {
+      console.error('Utilisateur non trouvé:', username);
+      return res.status(401).json({ message: "Nom d'utilisateur ou mot de passe incorrect." });
     }
 
-    // Définir le rôle
-    const role = user.role || 'User';
+    // Vérifier le mot de passe
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      console.error('Mot de passe incorrect pour l\'utilisateur:', username);
+      return res.status(401).json({ message: "Nom d'utilisateur ou mot de passe incorrect." });
+    }
 
-    // **Générer le token JWT**
+    // Générer un token JWT
     const token = jwt.sign(
-      { id: user._id, username: user.username, role: role },
-      process.env.JWT_SECRET || 'secretKey', // Utilise une clé secrète stockée dans une variable d’environnement
-      { expiresIn: '7d' } // Le token expire en 7 jours
+      { id: user._id, username: user.username, role: user.role || 'User' },
+      process.env.JWT_SECRET || 'secretKey',
+      { expiresIn: '7d' }
     );
 
-    // Renvoyer les infos de l'utilisateur avec le token, l'ID du chatbot et les notifications
-    res.status(200).json({
-      message: 'Connexion réussie',
-      token, // Ajout du token ici
-      user: {
-        id: user._id,
-        firstName: user.firstname,
-        lastName: user.lastname,
-        username: user.username,
-        email: user.email,
-        city: user.city,
-        image: user.image,
-        role: role,
-        chatbotId: user.chatbot, // Ajout de l'ID du chatbot
-        notifications: user.notifications, // Ajout des notifications
-        ...(role === 'Dentist' && {
-          phone: user.phone,
-          address: user.address,
-          workDays: user.workDays,
-          workHours: user.workHours,
-        }),
-      },
-    });
+    // Retourner une réponse sécurisée
+    const userResponse = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      notifications: user.notifications,
+    };
+
+    res.status(200).json({ message: 'Connexion réussie', token, user: userResponse });
   } catch (error) {
     console.error('Erreur lors de la connexion:', error);
-    res.status(500).json({ message: 'Erreur de serveur lors de la connexion.', error: error.message });
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
 
-
-app.put('/api/users/:id', upload.single('image'), async (req, res) => {
-  const { id } = req.params;
-  let { password, workDays, workHours, ...updateData } = req.body;
-
-  console.log("Données reçues :", req.body);
-
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ message: "ID invalide." });
-  }
-
-  try {
-    // Vérifier si l'utilisateur existe
-    const existingUser = await User.findById(id);
-    if (!existingUser) {
-      return res.status(404).json({ message: "Utilisateur non trouvé." });
-    }
-
-    // Gérer la mise à jour du mot de passe
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(password, salt);
-    }
-
-    // Gérer l'upload d'image
-    if (req.file) {
-      updateData.image = req.file.path; // Mettre à jour l'image de profil
-    }
-
-    // Vérifier si l'utilisateur est un dentiste et traiter les champs spécifiques
-    if (existingUser.role === 'Dentist') {
-      if (workDays) {
-        try {
-          updateData.workDays = JSON.parse(workDays); // Parser workDays
-        } catch (err) {
-          console.error("Erreur lors du parsing de workDays :", err);
-          return res.status(400).json({ message: 'Format invalide pour workDays' });
-        }
-      }
-
-      if (workHours) {
-        try {
-          updateData.workHours = JSON.parse(workHours); // Parser workHours
-        } catch (err) {
-          console.error("Erreur lors du parsing de workHours :", err);
-          return res.status(400).json({ message: 'Format invalide pour workHours' });
-        }
-      }
-    }
-
-    console.log("Données à mettre à jour :", updateData);
-
-    // Mise à jour de l'utilisateur
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      { $set: updateData }, // Utiliser $set pour écraser les anciennes valeurs
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "Utilisateur non trouvé." });
-    }
-
-    console.log("Utilisateur mis à jour :", updatedUser);
-    res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error("Erreur lors de la mise à jour de l'utilisateur:", error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: "Erreur de serveur." });
-  }
-});
-
-
+/**Route pour envoyer une image à l'API Flask et obtenir un diagnostic**
 app.post('/api/diagnostic', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Image is required' });
-    }
+    if (!req.file) return res.status(400).json({ message: 'Image requise' });
 
-    // Préparer l'image pour l'envoyer à l'API Flask
+    const imageBuffer = fs.readFileSync(req.file.path);
     const formData = new FormData();
-    formData.append('image', req.file.buffer, req.file.originalname);
+    formData.append('image', imageBuffer, req.file.originalname);
 
-    // Appel à l'API Flask pour obtenir le diagnostic
     const flaskResponse = await axios.post('http://127.0.0.1:5000/diagnostic', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: formData.getHeaders(),
     });
 
-    const { data } = flaskResponse;
-    res.status(200).json(data); // Renvoyer la réponse de Flask
+    res.status(200).json(flaskResponse.data);
   } catch (error) {
-    console.error('Error during diagnostic:', error);
-    res.status(500).json({ message: 'Error in diagnostic process' });
+    console.error('Erreur lors du diagnostic:', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
-});
+});*/
 
-
-/// Créer une nouvelle conversation
-app.post("/api/conversations/create", async (req, res) => {
+// **Route pour récupérer les notifications d'un utilisateur**
+app.get('/api/notifications/user/:userId', async (req, res) => {
   try {
-    const { userId, chatbotId } = req.body;
-
-    // Vérifier si l'utilisateur existe
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "Utilisateur non trouvé" });
-    }
-
-    // Créer une nouvelle conversation
-    const newConversation = new ChatConversation({
-      creator: userId,
-      chatbot: chatbotId,
-      participants: [userId],
-      messages: [],
-    });
-
-    await newConversation.save();
-
-    res.status(201).json(newConversation);
-  } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Erreur lors de la création de la conversation", error: error.message });
-  }
-});
-
-// Récupérer les conversations d'un utilisateur
-app.get("/api/conversations/user/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
-
-    // Vérifier si l'utilisateur existe
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "Utilisateur introuvable" });
-
-    // Récupérer toutes les conversations de l'utilisateur
-    const conversations = await ChatConversation.find({ creator: userId })
-      .populate("participants", "username firstname lastname") // Inclure les détails des participants
-      .populate("chatbot"); // Inclure les détails du chatbot
-
-    res.json(conversations);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
-  }
-});
-
-app.get("/api/conversations/:conversationId", authMiddleware, async (req, res) => {
-  try {
-    const conversation = await ChatConversation.findById(req.params.conversationId)
-      .populate("messages.sender", "username firstname lastname");
-
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation non trouvée" });
-    }
-
-    // Vérifiez que l'utilisateur est un participant
-    const userId = req.user.id; // Supposons que req.user est défini par le middleware d'authentification
-    if (!conversation.participants.includes(userId)) {
-      return res.status(403).json({ message: "Accès non autorisé" });
-    }
-
-    res.json(conversation);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
-  }
-});
-// Ajouter un message à une conversation
-app.post("/api/conversations/:conversationId/message", async (req, res) => {
-  try {
-    const { sender, message } = req.body;
-    const conversationId = req.params.conversationId;
-
-    // Vérifier si la conversation existe
-    const conversation = await ChatConversation.findById(conversationId);
-    if (!conversation) return res.status(404).json({ message: "Conversation introuvable" });
-
-    // Ajouter le message
-    conversation.messages.push({ sender, message, timestamp: new Date() });
-    await conversation.save();
-
-    res.json(conversation);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
-  }
-});
-
-// Récupérer les messages d'une conversation
-app.get("/api/conversations/:conversationId/messages", async (req, res) => {
-  try {
-    const conversationId = req.params.conversationId;
-
-    // Vérifier si la conversation existe
-    const conversation = await ChatConversation.findById(conversationId)
-      .populate("messages.sender", "username firstname lastname");
-
-    if (!conversation) return res.status(404).json({ message: "Conversation introuvable" });
-
-    res.json(conversation.messages);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
-  }
-});
-
-
-
-
-app.get("/api/notifications/user/:userId", async (req, res) => {
-  try {
-    const notifications = await Notification.find({ receiver: req.params.userId })
-      .sort({ timestamp: -1 }); // Trier par date décroissante
-
+    const notifications = await Notification.find({ receiver: req.params.userId }).sort({ timestamp: -1 });
     res.json(notifications);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    res.status(500).json({ message: "Erreur serveur." });
   }
 });
 
 
-app.get('/api/dentists', async (req, res) => {
-  const { city } = req.query;
-
+// Route pour créer un ChatDiagnostic
+app.post('/api/chatdiagnostic', async (req, res) => {
   try {
-    // Construire la requête en fonction de la ville (si fournie)
-    let query = { __t: 'Dentist' }; // Filtrer uniquement les documents de type "Dentist"
+    const { user } = req.body;
 
-    // Récupérer les dentistes avec les informations du modèle User
-    const dentists = await User.find(query)
-      .select('name email city address phone workDays workHours') // Sélectionner les champs nécessaires
-      .exec();
+    // Valider l'ID utilisateur
+    if (!user || !mongoose.Types.ObjectId.isValid(user)) {
+      return res.status(400).json({ success: false, message: 'ID utilisateur invalide.' });
+    }
 
-    // Formater la réponse
-    const formattedDentists = dentists.map((dentist) => ({
+    // Vérifier si l'utilisateur existe dans la base de données
+    const userExists = await User.findById(user);
+    if (!userExists) {
+      return res.status(404).json({ success: false, message: `Utilisateur non trouvé: ${user}` });
+    }
+
+    // Vérifier si un ChatDiagnostic existe déjà pour l'utilisateur
+    let chatDiagnostic = await ChatDiagnostic.findOne({ user });
+
+    if (!chatDiagnostic) {
+      // Créer un nouveau ChatDiagnostic si aucun n'existe
+      chatDiagnostic = new ChatDiagnostic({
+        user,
+        sharedWith: [],
+        messages: [],
+      });
+
+      await chatDiagnostic.save();
+
+      // Créer un nouveau DossierMedical pour l'utilisateur
+      const dossierMedical = new DossierMedical({
+        user,
+        images: [], // Initialiser avec un tableau vide pour les images
+        diagnosticText: '', // Initialiser avec une chaîne vide pour le résumé
+      });
+
+      await dossierMedical.save();
+    }
+
+    // Envoyer la réponse avec l'objet chatDiagnostic
+    res.status(200).json({
+      success: true,
+      message: 'Chat diagnostic récupéré ou créé avec succès',
+      chatDiagnostic, // Inclure le chatDiagnostic dans la réponse
+    });
+  } catch (error) {
+    console.error('Erreur lors de la création ou de la récupération du chat diagnostic:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur.',
+      error: error.message, // Inclure le message d'erreur pour le débogage
+    });
+  }
+});
+app.post('/api/diagnostic', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    console.log('Début de la route /api/diagnostic');
+    console.log('Fichier reçu:', req.file);
+
+    // Vérifier que l'utilisateur est authentifié
+    console.log('Utilisateur authentifié:', req.user);
+    if (!req.user || !req.user.id) { // Utiliser req.user.id au lieu de req.user._id
+      return res.status(401).json({ message: 'Utilisateur non authentifié.' });
+    }
+
+    const userId = req.user.id; // Utiliser req.user.id
+
+    if (!req.file) {
+      console.error('Aucun fichier reçu');
+      return res.status(400).json({ message: 'Aucun fichier reçu.' });
+    }
+
+    // Valider le type de fichier
+    const allowedMimeTypes = ['image/jpeg', 'image/png'];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      fs.unlinkSync(req.file.path); // Supprimer le fichier temporaire
+      console.error('Type de fichier invalide:', req.file.mimetype);
+      return res.status(400).json({ message: 'Type de fichier invalide. Seuls JPEG et PNG sont autorisés.' });
+    }
+
+    const imagePath = req.file.path;
+
+    // Envoyer l'image à l'API Flask pour le diagnostic
+    console.log('Envoi de l\'image à l\'API Flask');
+    const imageBuffer = fs.readFileSync(imagePath);
+    const formData = new FormData();
+    formData.append('image', imageBuffer, req.file.originalname);
+
+    const flaskResponse = await axios.post('http://127.0.0.1:5000/diagnostic', formData, {
+      headers: formData.getHeaders(),
+    });
+    console.log('Réponse de l\'API Flask:', flaskResponse.data);
+
+    const diagnosticData = flaskResponse.data;
+
+    // Récupérer ou créer un ChatDiagnostic pour l'utilisateur
+    let chatDiagnostic = await ChatDiagnostic.findOne({ user: userId });
+
+    if (!chatDiagnostic) {
+      chatDiagnostic = new ChatDiagnostic({
+        user: userId,
+        sharedWith: [],
+        messages: [],
+      });
+    }
+
+    // Ajouter le nouveau message (image et réponse) au ChatDiagnostic
+    chatDiagnostic.messages.push({
+      image: imagePath,
+      response: diagnosticData.diagnostic[0].description,
+    });
+
+    console.log('Sauvegarde du ChatDiagnostic');
+    await chatDiagnostic.save();
+    console.log('ChatDiagnostic sauvegardé:', chatDiagnostic);
+
+    // Récupérer ou créer un DossierMedical pour l'utilisateur
+    let dossierMedical = await DossierMedical.findOne({ user: userId });
+
+    if (!dossierMedical) {
+      dossierMedical = new DossierMedical({
+        user: userId,
+        images: [],
+        diagnosticText: '',
+      });
+    }
+
+    // Ajouter l'image et le diagnostic au DossierMedical
+    dossierMedical.images.push(imagePath);
+    dossierMedical.diagnosticText = diagnosticData.diagnostic[0].description;
+    console.log('Sauvegarde du DossierMedical');
+    await dossierMedical.save();
+    console.log('DossierMedical sauvegardé:', dossierMedical);
+
+    // Supprimer le fichier temporaire
+    fs.unlinkSync(imagePath);
+
+    res.status(200).json({
+      message: 'Diagnostic sauvegardé avec succès.',
+      diagnostic: diagnosticData,
+      chatDiagnostic,
+    });
+  } catch (error) {
+    console.error('Erreur lors du diagnostic:', error.stack);
+
+    // Supprimer le fichier temporaire en cas d'erreur
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({ message: 'Erreur lors du diagnostic. Veuillez réessayer.', error: error.message });
+  }
+});
+// Route pour Sauvegarder dans le DossierMedical
+app.post('/api/dossierMedical', async (req, res) => {
+  try {
+    const { image, diagnosticText } = req.body;
+    const dossierMedical = new DossierMedical({
+      user: req.user._id, // Supposons que l'utilisateur est authentifié
+      images: [image],
+      diagnosticText,
+    });
+    await dossierMedical.save();
+    res.status(201).json({ message: 'Dossier médical mis à jour.' });
+  } catch (error) {
+    console.error('Erreur:', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+// Récupérer les messages de ChatDiagnostic
+app.get('/api/chatdiagnostic', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id.toString(); // Convertir en chaîne si nécessaire
+    const chatDiagnostic = await ChatDiagnostic.findOne({ user: userId });
+
+    if (!chatDiagnostic) {
+      return res.status(404).json({ message: 'Aucun diagnostic trouvé pour cet utilisateur.' });
+    }
+
+    // Renvoyer uniquement les messages
+    res.json(chatDiagnostic.messages);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+
+// Route pour Partager le chat avec un dentiste
+app.post('/api/shareChat', async (req, res) => {
+  try {
+    const { dentistId, chatHistory } = req.body;
+    const chatDiagnostic = new ChatDiagnostic({
+      user: req.user._id, // Supposons que l'utilisateur est authentifié
+      sharedWith: [dentistId],
+      messages: chatHistory,
+    });
+    await chatDiagnostic.save();
+    res.status(201).json({ message: 'Chat partagé avec succès.' });
+  } catch (error) {
+    console.error('Erreur:', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+app.get('/api/dentists', async (req, res) => {
+  try {
+    const dentists = await Dentist.find().select('username email city address phone workDays workHours');
+
+    const formattedDentists = dentists.map(dentist => ({
       _id: dentist._id,
-      name: dentist.name,
+      username: dentist.username,
       email: dentist.email,
       city: dentist.city,
       address: dentist.address,
@@ -471,6 +424,99 @@ app.get('/api/dentists', async (req, res) => {
     res.status(500).json({ message: "Erreur du serveur", error });
   }
 });
+// Route pour supprimer un dentiste
+app.delete('/api/dentists/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Supprimer le dentiste
+    const deletedDentist = await Dentist.findByIdAndDelete(id);
+
+    if (!deletedDentist) {
+      return res.status(404).json({ message: 'Dentiste introuvable' });
+    }
+
+    res.status(200).json({ message: 'Dentiste supprimé avec succès', dentist: deletedDentist });
+  } catch (error) {
+    console.error('Erreur lors de la suppression du dentiste:', error.message);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+
+
+// Récupérer la conversation de l'utilisateur
+app.get('/api/chatbot/conversation', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id; // Vérifie que l'ID est bien récupéré
+    console.log('ID utilisateur:', userId);
+
+    const user = await User.findById(userId).populate('chatbot');
+    console.log('Utilisateur trouvé:', user);
+
+    if (!user || !user.chatbot) {
+      console.log('Aucune conversation trouvée pour cet utilisateur.');
+      return res.status(404).json({ message: 'Aucune conversation trouvée' });
+    }
+
+    console.log('Messages récupérés:', user.chatbot.messages);
+    res.json(user.chatbot.messages);
+  } catch (error) {
+    console.error('Erreur serveur:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+// Ajouter un message à la conversation
+app.post('/api/chatbot/conversation', authMiddleware, async (req, res) => {
+  const { sender, text } = req.body;
+  try {
+    const userId = req.user.id.toString(); // Convertir en chaîne si nécessaire
+    let user = await User.findById(userId).populate('chatbot');
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Créer une nouvelle conversation si elle n'existe pas
+    if (!user.chatbot) {
+      const newConversation = new ChatbotConversation({ user: userId, messages: [] });
+      await newConversation.save();
+      user.chatbot = newConversation._id;
+      await user.save();
+    }
+
+    // Ajouter le message à la conversation
+    const conversation = await ChatbotConversation.findById(user.chatbot._id);
+    conversation.messages.push({ sender, text });
+    await conversation.save();
+
+    res.json(conversation);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+// Supprimer la conversation de l'utilisateur
+app.delete('/api/chatbot/conversation', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id.toString(); // Convertir en chaîne si nécessaire
+    const user = await User.findById(userId).populate('chatbot');
+    if (!user || !user.chatbot) {
+      return res.status(404).json({ message: 'Conversation non trouvée' });
+    }
+
+    // Supprimer la conversation
+    await ChatbotConversation.findByIdAndDelete(user.chatbot._id);
+    user.chatbot = null;
+    await user.save();
+
+    res.json({ message: 'Conversation supprimée avec succès' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+
 /*
 // Exemple avec Express et MongoDB
 app.get('/api/dentists', (req, res) => {
@@ -538,24 +584,7 @@ app.put('/api/dentists/:id', async (req, res) => {
   }
 });
 
-// Route pour supprimer un dentiste
-app.delete('/api/dentists/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
 
-    // Supprimer le dentiste
-    const deletedDentist = await Dentist.findByIdAndDelete(id);
-
-    if (!deletedDentist) {
-      return res.status(404).json({ message: 'Dentiste introuvable' });
-    }
-
-    res.status(200).json({ message: 'Dentiste supprimé avec succès', dentist: deletedDentist });
-  } catch (error) {
-    console.error('Erreur lors de la suppression du dentiste:', error.message);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
-});
 
 */
 // Start Server

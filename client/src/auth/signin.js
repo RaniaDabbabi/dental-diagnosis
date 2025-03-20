@@ -53,11 +53,6 @@ const SignIn = () => {
         // Stocker les informations de l'utilisateur dans localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Stocker l'ID du chatbot dans localStorage
-        if (data.user.chatbotId) {
-          localStorage.setItem('chatbotId', data.user.chatbotId);
-        }
-
         // Stocker les notifications dans localStorage
         if (data.user.notifications) {
           localStorage.setItem('notifications', JSON.stringify(data.user.notifications));
@@ -67,6 +62,8 @@ const SignIn = () => {
         setError(false);
         setLoading(false);
         navigate('/'); // Rediriger vers la page d'accueil
+        window.location.reload();
+
       } else {
         setMessage(data.message || 'Nom d\'utilisateur ou mot de passe incorrect.');
         setError(true);
@@ -74,12 +71,10 @@ const SignIn = () => {
       }
       const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user'));
-const chatbotId = localStorage.getItem('chatbotId');
 const notifications = JSON.parse(localStorage.getItem('notifications'));
 
 console.log("Token:", token);
 console.log("Utilisateur:", user);
-console.log("ID du chatbot:", chatbotId);
 console.log("Notifications:", notifications);
     } catch (error) {
       console.error('Erreur de connexion au serveur:', error);

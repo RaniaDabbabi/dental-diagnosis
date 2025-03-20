@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 export function Navbar() {
   const user = JSON.parse(localStorage.getItem('user'));
+
   const imageUrl = user?.image ? `http://localhost:5000/${user.image.replace(/\\/g, '/')}` : null;
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]); // État pour stocker les notifications
@@ -13,28 +14,36 @@ export function Navbar() {
 
   // Fonction pour charger les notifications de l'utilisateur
   const fetchNotifications = async () => {
-    if (!user) return;
-
+    if (!user || !user._id) return; // Vérifier si l'utilisateur est bien défini
+  
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/user/${user.id}`, {
+      const response = await fetch(`http://localhost:5000/api/notifications/user/${user._id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
       const data = await response.json();
       setNotifications(data);
     } catch (error) {
       console.error('Erreur lors du chargement des notifications:', error);
     }
   };
-
-  // Charger les notifications au montage du composant
+  
+  // Exécuter la requête une seule fois lorsque `user` est chargé
   useEffect(() => {
-    fetchNotifications();
-  }, [user]);
+    if (user && user._id) {
+      fetchNotifications();
+    }
+  }, []); 
+  
 
   // Fonction pour gérer la déconnexion
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('chatdiagnosticId')
+    localStorage.removeItem('notifications')
     navigate('/');
     window.location.reload();
   };
