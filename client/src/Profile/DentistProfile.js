@@ -7,8 +7,8 @@ const DentistProfile = () => {
   });
 
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    firstname: '',
+    lastname: '',
     phone: '',
     address: '',
     workDays: '',
@@ -16,18 +16,22 @@ const DentistProfile = () => {
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState({ loading: false, error: null, success: false });
 
   useEffect(() => {
-    console.log("Données de l'utilisateur mises à jour :", user);
     if (user && Object.keys(user).length > 0) {
       setFormData({
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
+        firstname: user.firstname || '',
+        lastname: user.lastname || '',
         phone: user.phone || '',
         address: user.address || '',
-        workDays: Array.isArray(user.workDays) ? user.workDays.join(', ') : '',
+        workDays: Array.isArray(user.workDays) ? user.workDays.join(', ') : user.workDays || '',
         workHours: user.workHours
-          ? { start: user.workHours.open || '', end: user.workHours.close || '' }
+          ? {
+              start: user.workHours.open || user.workHours.start || '',
+              end: user.workHours.close || user.workHours.end || ''
+            }
           : { start: '', end: '' },
       });
     }
@@ -50,48 +54,69 @@ const DentistProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setStatus({ loading: true, error: null, success: false });
+  
+    try {
+      const userId = user?.id ?? user?._id;
+      if (!userId) throw new Error("ID utilisateur introuvable");
+  // Dans handleSubmit, avant le fetch
+console.log("Données envoyées:", {
+  firstname: formData.firstname,
+  lastname: formData.lastname,
+  phone: formData.phone,
+  address: formData.address,
+  workDays: formData.workDays.split(',').map(d => d.trim()),
+  workHours: {
+    open: formData.workHours.start,
+    close: formData.workHours.end
+  }
+});
 
-    // Validation de workDays
-    const validDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-    const days = formData.workDays.split(',').map(day => day.trim());
-    const invalidDays = days.filter(day => !validDays.includes(day));
-    if (invalidDays.length > 0) {
-      alert(`Jours invalides : ${invalidDays.join(', ')}`);
-      return;
-    }
-
-      const updatedUserData = {
-        firstname: formData.firstName,
-        lastname: formData.lastName,
-        phone: formData.phone,
-        address: formData.address,
-        workDays: JSON.stringify(formData.workDays.split(',').map(day => day.trim())), // Convertir en chaîne JSON
-        workHours: JSON.stringify(formData.workHours), // Convertir en chaîne JSON
+console.log("Token:", localStorage.getItem('token'));
+console.log("User ID:", user?.id ?? user?._id);
+      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          firstname: formData.firstname,
+          lastname: formData.lastname,
+          phone: formData.phone,
+          address: formData.address,
+          workDays: formData.workDays.split(',').map(d => d.trim()),
+          workHours: {
+            start: formData.workHours.start,
+            end: formData.workHours.end
+          }
+        })
+      });
+  
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || "Échec de la mise à jour");
+      }
+  
+      // Mise à jour complète de l'état utilisateur
+      const updatedUser = { 
+        ...user, 
+        ...result.user,
+        workHours: result.user.workHours || formData.workHours
       };
-    
-      try {
-        const userId = user?.id ?? user?._id;
-      if (!userId) {
-        alert("Erreur : ID utilisateur introuvable !");
-        return;
-      }
-        const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedUserData),
-        });
-    
-        const data = await response.json();
-        if (response.ok) {
-          console.log("Profil mis à jour avec succès !", data);
-        } else {
-          console.error("Erreur lors de la mise à jour du profil :", data.message);
-        }
-      } catch (error) {
-        console.error("Erreur de connexion au serveur :", error);
-      }
-    };
-
+  
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setStatus({ loading: false, error: null, success: true });
+      setIsEditing(false);
+  
+    } catch (err) {
+      console.error("Erreur:", err);
+      setStatus({ loading: false, error: err.message, success: false });
+    }
+  };
+  
   return (
     <div className="container mt-5">
       <h1>Profil Dentiste</h1>
@@ -122,27 +147,20 @@ const DentistProfile = () => {
               />
             )}
             <div>
-              <h2>{user?.username ?? 'Nom d’utilisateur'}</h2>
+              <h2>{user?.username ?? 'utilisateur'}</h2>
               <p className="text-muted">{user?.role ?? 'Rôle non défini'}</p>
             </div>
           </div>
           <hr />
           <h3>Informations professionnelles</h3>
           <form onSubmit={handleSubmit}>
-            {['firstName', 'lastName', 'phone', 'address'].map((field) => (
+            {['firstname', 'lastname', 'phone', 'address'].map((field) => (
               <div className="mb-3" key={field}>
-                <label className="form-label">
-                  <strong>
-                    {field === 'firstName'
-                      ? 'Prénom'
-                      : field === 'lastName'
-                      ? 'Nom'
-                      : field === 'phone'
-                      ? 'Téléphone'
-                      : 'Adresse'}
-                    :
-                  </strong>
-                </label>
+                <label className="form-label"><strong>
+                  {field === 'firstname' ? 'Prénom' :
+                   field === 'lastname' ? 'Nom' :
+                   field === 'phone' ? 'Téléphone' : 'Adresse'}
+                </strong></label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -156,12 +174,9 @@ const DentistProfile = () => {
                 )}
               </div>
             ))}
-  
-            {/* Traitement spécifique pour workDays */}
+
             <div className="mb-3">
-              <label className="form-label">
-                <strong>Jours de travail :</strong>
-              </label>
+              <label className="form-label"><strong>Jours de travail :</strong></label>
               {isEditing ? (
                 <input
                   type="text"
@@ -173,14 +188,13 @@ const DentistProfile = () => {
                 />
               ) : (
                 <ul>
-                  {formData.workDays.split(',').map((day, index) => (
+                  {formData.workDays && formData.workDays.split(',').map((day, index) => (
                     <li key={index}>{day.trim()}</li>
                   ))}
                 </ul>
               )}
             </div>
-  
-            {/* Heures de travail */}
+
             <div className="mb-3">
               <label className="form-label"><strong>Heures de travail :</strong></label>
               {isEditing ? (
@@ -192,6 +206,7 @@ const DentistProfile = () => {
                     onChange={handleChange}
                     className="form-control"
                   />
+                  <span className="align-self-center">à</span>
                   <input
                     type="time"
                     name="workHoursEnd"
@@ -201,23 +216,35 @@ const DentistProfile = () => {
                   />
                 </div>
               ) : (
-                <p>{formData.workHours.start || 'Non défini'} - {formData.workHours.end || 'Non défini'}</p>
+                <p>
+                  {formData.workHours.start || 'Non défini'} - {formData.workHours.end || 'Non défini'}
+                </p>
               )}
             </div>
-  
-            {isEditing && (
-              <button type="submit" className="btn btn-success me-2">
-                Enregistrer les modifications
+
+            <div className="d-flex gap-2">
+              {isEditing && (
+                <button 
+                  type="submit" 
+                  className="btn btn-success"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              )}
+              <button
+                type="button"
+                className={`btn ${isEditing ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={() => setIsEditing(!isEditing)}
+                disabled={isLoading}
+              >
+                {isEditing ? 'Annuler' : 'Modifier'}
               </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              {isEditing ? 'Annuler' : 'Modifier le profil'}
-            </button>
+            </div>
           </form>
+
+          {status.error && <div className="alert alert-danger mt-3">{status.error}</div>}
+          {status.success && <div className="alert alert-success mt-3">Profil mis à jour avec succès.</div>}
         </div>
       </div>
     </div>

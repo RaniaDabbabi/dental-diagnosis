@@ -11,6 +11,7 @@
     "axios": "^1.7.7",
     "bootstrap": "^5.3.3",
     "client": "file:",
+    "framer-motion": "^7.6.17",
     "jquery": "^3.7.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",

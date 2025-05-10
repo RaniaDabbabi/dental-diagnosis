@@ -10,7 +10,7 @@ const ChatDiagnostic = () => {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [dentists, setDentists] = useState([]);
   const [error, setError] = useState(null);
-
+  
   // Charger les messages de ChatDiagnostic au montage du composant
   useEffect(() => {
     const fetchChatDiagnostic = async () => {
@@ -25,19 +25,13 @@ const ChatDiagnostic = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        const formattedMessages = res.data.map((msg) => ({
-          type: msg.image ? 'user' : 'bot',
-          image: msg.image || null,
-          text: msg.response || null,
-        }));
-
-        setHistory(formattedMessages);
+        console.log('Données reçues:', res.data); // Ajoutez ce log
+        setHistory(res.data);
       } catch (error) {
-        console.error('Erreur lors de la récupération des messages :', error);
-        setError('Échec de la récupération des messages.');
+        console.error('Erreur lors de la récupération des messages de diagnostic :', error);
+        setError('Échec de la récupération des messages de diagnostic.');
       }
     };
-
     fetchChatDiagnostic();
   }, []);
 
@@ -45,27 +39,28 @@ const ChatDiagnostic = () => {
     const file = event.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError("L'image ne doit pas dépasser 5 Mo.");
+        setError('La taille de l\'image ne doit pas dépasser 5 Mo.');
         return;
       }
+      console.log('Fichier sélectionné:', file);
       setSelectedImage(file);
       setPreviewImage(URL.createObjectURL(file));
       setError(null);
     }
   };
-
+  console.log('History mis à jour:', history);
   const sendImageForDiagnosis = useCallback(async () => {
     if (!selectedImage) {
       setError('Veuillez sélectionner une image.');
       return;
     }
-
+  
     setIsLoading(true);
     setError(null);
-    
+  
     const formData = new FormData();
     formData.append('image', selectedImage);
-
+  
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -73,20 +68,27 @@ const ChatDiagnostic = () => {
         setIsLoading(false);
         return;
       }
-
+  
+      // Envoyer l'image au backend
       const response = await axios.post('http://localhost:5000/api/diagnostic', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-
-      setHistory((prevHistory) => [
-        ...prevHistory,
-        { type: 'user', image: previewImage },
-        { type: 'bot', text: response.data.diagnostic.diagnosis },
-      ]);
-
+  
+      console.log('Réponse du backend:', response.data); // Log pour vérifier la réponse
+  
+      // Récupérer les données mises à jour après l'envoi
+      const updatedResponse = await axios.get('http://localhost:5000/api/chatdiagnostic', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+  
+      console.log('Données mises à jour:', updatedResponse.data); // Log pour vérifier les données mises à jour
+  
+      // Mettre à jour l'état local avec les données mises à jour
+      setHistory(updatedResponse.data);
+  
       setSelectedImage(null);
       setPreviewImage(null);
     } catch (error) {
@@ -95,7 +97,7 @@ const ChatDiagnostic = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedImage, previewImage]);
+  }, [selectedImage]);
 
   const ShareDialog = ({ show, dentists, onClose, onShare }) => {
     const [selectedDentist, setSelectedDentist] = useState('');
@@ -167,15 +169,17 @@ const ChatDiagnostic = () => {
 
         <div id="chat-history">
           {history.map((message, index) => (
-            <div key={index} className={`message-container ${message.type === 'user' ? 'user-message-container' : 'bot-message-container'}`}>
-              {message.image && (
+            <div
+              key={index}
+              className={`message-container ${message.type === 'user' ? 'user-message-container' : 'bot-message-container'}`}
+            >
+              {message.type === 'user' ? (
                 <div className="image-container">
-                  <img src={message.image} alt="Envoyé" className="message-image" />
+                  <img src={message.content} alt="Envoyé" className="message-image" />
                 </div>
-              )}
-              {message.text && (
+              ) : (
                 <div className="text-container">
-                  <p>{message.text}</p>
+                  <p>{message.content}</p>
                 </div>
               )}
             </div>

@@ -14,6 +14,8 @@ import Apropos from'./Apropos';
 import DentistProfile from './Profile/DentistProfile';
 import UserProfile from './Profile/UserProfile';
 import FloatingChatbot from './FloatingChatbot';
+import ContactUsPage from './ContactUsPage';
+import Dashboard from './HomeLogin';
 
 const isAuthenticated = () => {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -23,10 +25,10 @@ const isAuthenticated = () => {
 function App() {
   return (
     <Router>
-      <div className="d-flex flex-column min-vh-100">
+      <div className="d-flex flex-column min-vh-100" style={layoutStyles.appContainer}>
         <Navbar />
-        <main className="flex-grow-1 container my-4">
-          <Routes>
+        <main className={`flex-grow-1 ${window.location.pathname === "/Home" ? "" : "container"}`}>
+        <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
@@ -39,7 +41,11 @@ function App() {
             <Route path="/diagnostic/:chatdiagnosticId"
   element={isAuthenticated() ? <ChatDiagnostic /> : <Navigate to="/signin" replace />}
 />
+<Route path="/Home"
+  element={isAuthenticated() ? <Dashboard /> : <Navigate to="/signin" replace />}
+  className={`flex-grow-1  ${window.location.pathname === "/Home" ? "" : "container"}`}/>
             <Route path="/dentists" element={<DentistList />} />
+            <Route path="/ContactUs" element={<ContactUsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
@@ -52,3 +58,11 @@ function App() {
 }
 
 export default App;
+
+const layoutStyles = {
+  appContainer: {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+  }
+};

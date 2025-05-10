@@ -247,7 +247,7 @@
   border-radius: 10px;
 }
 
-/* Conteneur du texte (en dessous à gauche) */
+/* Conteneur du texte (à gauche) */
 .text-container {
   align-self: flex-start;
   background-color: white;
@@ -261,12 +261,6 @@
 /* Styles spécifiques pour les messages de l'utilisateur */
 .user-message-container .image-container {
   align-self: flex-end;
-}
-
-.user-message-container .text-container {
-  align-self: flex-end;
-  background-color: #1a53ff;
-  color: white;
 }
 
 /* Styles spécifiques pour les messages du bot */

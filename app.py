@@ -4,6 +4,10 @@ from PIL import Image
 import tensorflow as tf
 import numpy as np
 import random
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
+import subprocess
+import json
+import ollama
 
 app = Flask(__name__)
 CORS(app)
@@ -100,6 +104,24 @@ def diagnostic():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/chatbot/conversation', methods=['POST'])
+def chatbot_response():
+    data = request.json
+    user_message = data.get("text", "")
+
+    # Exécuter la commande Ollama pour obtenir une réponse
+    process = subprocess.run(
+        ["ollama", "run", "mistral", user_message],
+        capture_output=True,
+        text=True
+    )
+
+    bot_response = process.stdout.strip()  # Récupérer la réponse générée
+
+    response = {"sender": "bot", "text": bot_response}
+    return jsonify(response)
 
 
 if __name__ == '__main__':

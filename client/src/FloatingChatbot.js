@@ -8,25 +8,23 @@ const FloatingChatbot = ({ userId }) => {
   const [conversation, setConversation] = useState([]);
 
   // Charger la conversation au montage du composant
-  useEffect(() => {
-    const fetchConversation = async () => {
-      try {
-        console.log('Token:', localStorage.getItem('token'));
-        const res = await axios.get('http://localhost:5000/api/chatbot/conversation', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        console.log('Réponse API après rafraîchissement:', res.data);
-        setConversation(res.data);
-      } catch (error) {
-        console.error('Erreur lors de la récupération de la conversation:', error);
-      }
-    };
-  
-    fetchConversation();
-  }, [userId]);
-  
-  
-  
+useEffect(() => {
+  const fetchConversation = async () => {
+    try {
+      console.log('Token:', localStorage.getItem('token'));
+      
+      const res = await axios.get('http://localhost:5000/api/chatbot/conversation', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      console.log('Réponse API après rafraîchissement:', res.data);
+      setConversation(res.data);
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la conversation:', error);
+    }
+  };
+
+  fetchConversation();
+}, [userId]);  
 
   const toggleChat = () => {
     setIsOpen(!isOpen);

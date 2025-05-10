@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import './HomePage.css';
 import VideoList from './Home/VideoList';
 import ArticleList from './Home/ArticleList';
-
 function HomePage() {
   const navigate = useNavigate();
 

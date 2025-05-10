@@ -33,12 +33,14 @@ const UserProfile = () => {
               />
             )}
             <div>
-              <h2>{user.firstName} {user.lastName}</h2>
+              <h2>{user.firstname} {user.lastname}</h2>
               <p className="text-muted">{user.role}</p>
             </div>
           </div>
           <hr />
           <h3>Informations personnelles</h3>
+          <p><strong>Nom :</strong> {user.username}</p>
+
           <p><strong>Email :</strong> {user.email}</p>
           <p><strong>Ville :</strong> {user.city}</p>
         </div>

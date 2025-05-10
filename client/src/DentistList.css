@@ -1,80 +1,515 @@
+/* DentistList.css - Version corrigée et optimisée */
+
 .dentist-list-container {
-  font-family: Arial, sans-serif;
-  max-width: 800px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  max-width: 500px;
   margin: 0 auto;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 30px 10px;
+  background-color: #f5f7fa;
+  min-height: 20vh;
 }
 
 .title {
   text-align: center;
-  color: #333;
-  margin-bottom: 20px;
+  color: #2c3e50;
+  margin-bottom: 30px;
+  font-size: 2.2rem;
+  font-weight: 600;
+  position: relative;
+  padding-bottom: 15px;
+}
+
+.title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 4px;
+  background-color: #3498db;
+  border-radius: 2px;
 }
 
 .search-bar {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+  gap: 10px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .search-input {
-  padding: 10px;
-  width: 60%;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 12px 15px;
+  flex: 1;
+  border: 2px solid #dfe6e9;
+  border-radius: 8px;
   font-size: 16px;
-  margin-right: 10px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.search-input:focus {
+  border-color: #3498db;
+  box-shadow: 0 2px 10px rgba(52, 152, 219, 0.2);
+  outline: none;
 }
 
 .search-button {
-  padding: 10px 20px;
-  background-color: #4CAF50;
+  padding: 12px 25px;
+  background-color: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 16px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .search-button:hover {
-  background-color: #45a049;
+  background-color: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
+.search-button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Card Container */
 .card-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 25px;
+  margin-top: 30px;
 }
 
 .dentist-card {
   background-color: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  text-align: center;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
 
-.dentist-name {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 10px;
-  color: #333;
+.dentist-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+.dentist-photo-container {
+  height: 200px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dentist-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.dentist-card:hover .dentist-photo {
+  transform: scale(1.05);
 }
 
 .dentist-info {
-  font-size: 14px;
-  margin-bottom: 5px;
-  color: #555;
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.dentist-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.dentist-detail {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  color: #34495e;
+}
+
+.dentist-detail i {
+  margin-right: 10px;
+  color: #3498db;
+  min-width: 20px;
+  text-align: center;
+}
+
+.chat-button {
+  margin-top: 15px;
+  padding: 10px 0;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.chat-button:hover {
+  background-color: #2980b9;
+}
+
+.chat-button i {
+  font-size: 1rem;
+}
+
+/* Loading and Error States */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  color: #3498db;
+  font-size: 1.2rem;
 }
 
 .no-results {
   text-align: center;
-  color: #666;
-  font-size: 16px;
-  margin-top: 20px;
+  color: #7f8c8d;
+  font-size: 1.1rem;
+  margin-top: 40px;
+  grid-column: 1 / -1;
+}
+
+.alert {
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.alert-error {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+/* Chat System */
+.chat-bubbles-container {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 15px;
+  z-index: 1000;
+}
+
+.chat-wrapper {
+  transition: all 0.3s ease;
+}
+
+.chat-window {
+  width: 380px;
+  height: 500px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(0);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.chat-window.minimized {
+  height: 60px;
+}
+
+.chat-header {
+  background: linear-gradient(135deg, #3498db, #2c3e50);
+  color: white;
+  padding: 12px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-header h5 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.chat-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-controls button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-radius: 50%;
+}
+
+.chat-controls button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-controls .close-btn {
+  font-size: 1.1rem;
+  width: 26px;
+  height: 26px;
+}
+
+.chat-body {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  background-color: #f5f7fa;
+}
+
+.message {
+  max-width: 75%;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.message-content {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.message-time {
+  font-size: 0.7rem;
+  color: #7f8c8d;
+  margin-top: 4px;
+  padding: 0 14px;
+}
+
+.sent {
+  margin-left: auto;
+}
+
+.sent .message-content {
+  background-color: #3498db;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.sent .message-time {
+  text-align: right;
+}
+
+.received {
+  margin-right: auto;
+}
+
+.received .message-content {
+  background-color: #ecf0f1;
+  color: #2c3e50;
+  border-bottom-left-radius: 4px;
+}
+
+.received .message-time {
+  text-align: left;
+}
+
+.chat-footer {
+  padding: 12px;
+  background-color: white;
+  border-top: 1px solid #dfe6e9;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-footer input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #dfe6e9;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.chat-footer input:focus {
+  border-color: #3498db;
+}
+
+.chat-footer button {
+  padding: 10px 16px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.chat-footer button:hover {
+  background-color: #2980b9;
+}
+
+.chat-footer button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+/* Mini Chat Bubble */
+.chat-bubble-mini {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.chat-bubble-mini:hover {
+  transform: scale(1.1);
+}
+
+.chat-bubble-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%; /* Ajoutez ceci pour garder l'image ronde */
+}
+
+/* Bouton close - version unifiée */
+.close-mini {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #e74c3c;
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  border: 2px solid white;
+  z-index: 1000; /* Valeur très élevée */
+  pointer-events: none; /* Ajouté pour éviter les conflits */
+}
+
+.chat-bubble-mini:hover .close-mini {
+  opacity: 1;
+  pointer-events: auto; /* Réactive les interactions au survol */
+}
+
+.close-mini:hover {
+  background-color: #c0392b;
+  transform: scale(1.15);
+}
+/* Main Chat Bubble */
+.chat-bubble {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 70px;
+  height: 70px;
+  background-color: #3498db;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+  transition: all 0.3s ease;
+}
+
+.chat-bubble:hover {
+  background-color: #2980b9;
+  transform: scale(1.1);
+}
+
+.chat-bubble i {
+  font-size: 28px;
+}
+
+.chat-bubble.active {
+  display: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .card-container {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+  
+  .chat-window {
+    width: 280px;
+    height: 400px;
+  }
+  
+  .chat-bubble {
+    width: 60px;
+    height: 60px;
+    bottom: 20px;
+    right: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search-bar {
+    flex-direction: column;
+  }
+  
+  .search-input {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .chat-window {
+    width: calc(100% - 40px);
+    right: 20px;
+    left: 20px;
+  }
 }

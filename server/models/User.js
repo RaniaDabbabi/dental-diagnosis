@@ -15,6 +15,7 @@ const UserSchema = new mongoose.Schema({
   chatDiagnostic: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatDiagnostic' }, // ✅ Ajout de la conversation avec l'IA
   notifications: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Notification' }],
   dossierMedical: { type: mongoose.Schema.Types.ObjectId, ref: 'DossierMedical' },
+  chatConversations: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ChatConversation' }] // Liste des conversations de chat (références vers le modèle ChatConversation)
 
 }, options);
 

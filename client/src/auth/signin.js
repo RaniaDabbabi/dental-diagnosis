@@ -49,6 +49,7 @@ const SignIn = () => {
       if (response.ok && data.token) {
         // Stocker le token dans localStorage
         localStorage.setItem('token', data.token);
+        localStorage.setItem('userId', data.user._id); // Important pour le chat
 
         // Stocker les informations de l'utilisateur dans localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -61,7 +62,7 @@ const SignIn = () => {
         setMessage('Connexion réussie');
         setError(false);
         setLoading(false);
-        navigate('/'); // Rediriger vers la page d'accueil
+        navigate('/Home'); // Rediriger vers la page d'accueil
         window.location.reload();
 
       } else {
